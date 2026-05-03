@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+skill-manager-app/dist/
+skill-manager-app/src-tauri/target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temp
+*.tmp
+.cache/
+
+# Documentation (exclude from git)
+*.md
+!skill-manager-app/README.md
+!skill-manager-app/**/README.md
+
+# Design files
+*.pen
+*.jsx
+
+# Claude settings
+.claude/
