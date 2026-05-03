@@ -436,6 +436,77 @@ requires_agent: ">=2.0"
     }
 
     #[test]
+    fn parses_openclaw_json_with_multiple_json_blocks() {
+        let stdout = r#"[INFO] metadata follows
+{
+  "debug": true
+}
+[skills] actual output follows
+{
+  "skills": [
+    {
+      "name": "xlsx",
+      "description": "Spreadsheet skill",
+      "eligible": true,
+      "source": "openclaw-managed"
+    }
+  ]
+}"#;
+
+        let value = openclaw::parse_openclaw_skills_json(stdout).unwrap();
+        let skills = value
+            .get("skills")
+            .and_then(serde_json::Value::as_array)
+            .unwrap();
+
+        assert_eq!(skills.len(), 1);
+        assert_eq!(
+            skills[0].get("name").and_then(serde_json::Value::as_str),
+            Some("xlsx")
+        );
+    }
+
+    #[test]
+    fn openclaw_json_without_skills_array_fails() {
+        let stdout = r#"{"debug": true}"#;
+        let result = openclaw::parse_openclaw_skills_json(stdout);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("did not contain a top-level skills array"));
+    }
+
+    #[test]
+    fn openclaw_config_read_error_generates_warning() {
+        use std::fs;
+        use std::os::unix::fs::PermissionsExt;
+        use tempfile::TempDir;
+
+        let temp = TempDir::new().unwrap();
+        let openclaw_home = temp.path().join(".openclaw");
+        fs::create_dir(&openclaw_home).unwrap();
+        let config_path = openclaw_home.join("openclaw.json");
+        fs::write(&config_path, "{}").unwrap();
+
+        // Make file unreadable
+        let mut perms = fs::metadata(&config_path).unwrap().permissions();
+        perms.set_mode(0o000);
+        fs::set_permissions(&config_path, perms).unwrap();
+
+        let mut issues = Vec::new();
+        let result = openclaw::read_openclaw_config(&openclaw_home, &mut issues);
+
+        assert!(result.is_none());
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].message.contains("Unable to read OpenClaw config"));
+
+        // Restore permissions for cleanup
+        let mut perms = fs::metadata(&config_path).unwrap().permissions();
+        perms.set_mode(0o644);
+        let _ = fs::set_permissions(&config_path, perms);
+    }
+
+    #[test]
     fn openclaw_filter_requires_matching_source_and_overrides_description() {
         let loaded_skills = HashMap::from([(
             "xlsx".to_string(),

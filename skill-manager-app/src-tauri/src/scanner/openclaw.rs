@@ -52,19 +52,28 @@ pub fn openclaw_loaded_skills() -> Result<HashMap<String, OpenClawLoadedSkill>, 
 }
 
 pub fn parse_openclaw_skills_json(stdout: &str) -> Result<serde_json::Value, String> {
-    let mut json_start = None;
-    for (idx, line) in stdout.lines().enumerate() {
-        if line.trim().starts_with('{') {
-            json_start = Some(idx);
-            break;
+    let mut last_error = None;
+
+    for (index, _) in stdout.char_indices().filter(|(_, ch)| *ch == '{').rev() {
+        match serde_json::from_str::<serde_json::Value>(&stdout[index..]) {
+            Ok(value)
+                if value
+                    .get("skills")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some() =>
+            {
+                return Ok(value);
+            }
+            Ok(_) => {
+                last_error = Some("JSON did not contain a top-level skills array".to_string());
+            }
+            Err(error) => {
+                last_error = Some(error.to_string());
+            }
         }
     }
 
-    let json_start = json_start.ok_or_else(|| "No JSON object found in openclaw output".to_string())?;
-    let json_lines: Vec<&str> = stdout.lines().skip(json_start).collect();
-    let json_str = json_lines.join("\n");
-
-    serde_json::from_str(&json_str).map_err(|error| error.to_string())
+    Err(last_error.unwrap_or_else(|| "openclaw did not print JSON".to_string()))
 }
 
 pub fn read_openclaw_config(
@@ -73,6 +82,7 @@ pub fn read_openclaw_config(
 ) -> Option<serde_json::Value> {
     use crate::models::{IssueLevel, ScanIssue};
     use std::fs;
+    use std::io::ErrorKind;
 
     let config_path = openclaw_home.join("openclaw.json");
     if !config_path.exists() {
@@ -81,7 +91,15 @@ pub fn read_openclaw_config(
 
     let raw = match fs::read_to_string(&config_path) {
         Ok(raw) => raw,
-        Err(_) => return None,
+        Err(error) if error.kind() == ErrorKind::NotFound => return None,
+        Err(error) => {
+            issues.push(ScanIssue {
+                path: config_path,
+                level: IssueLevel::Warning,
+                message: format!("Unable to read OpenClaw config: {error}"),
+            });
+            return None;
+        }
     };
 
     match serde_json::from_str(&raw) {
