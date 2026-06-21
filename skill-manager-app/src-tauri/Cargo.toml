@@ -1,6 +1,6 @@
 [package]
 name = "skill-manager-app"
-version = "0.1.0"
+version = "0.2.0"
 description = "A read-only desktop manager for AI Agent skills"
 authors = ["FrostTyr"]
 edition = "2021"
@@ -21,4 +21,3 @@ thiserror = "2"
 
 [dev-dependencies]
 tempfile = "3.27.0"
-

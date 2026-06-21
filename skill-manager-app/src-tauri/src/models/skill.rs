@@ -3,6 +3,32 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SkillFileEntry {
+    pub relative_path: String,
+    pub name: String,
+    pub is_directory: bool,
+    pub depth: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillFileContent {
+    pub relative_path: String,
+    pub content: String,
+    pub language: String,
+    pub is_markdown: bool,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppOption {
+    pub key: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Skill {
     pub id: String,
     pub name: String,

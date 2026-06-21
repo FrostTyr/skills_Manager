@@ -22,8 +22,12 @@ export function renderMarkdown(source: string): string {
 }
 
 export function renderMarkdownSource(source: string): string {
-  const highlighted = hljs.getLanguage('markdown')
-    ? hljs.highlight(source, { language: 'markdown', ignoreIllegals: true }).value
+  return renderSource(source, 'markdown')
+}
+
+export function renderSource(source: string, language: string): string {
+  const highlighted = hljs.getLanguage(language)
+    ? hljs.highlight(source, { language, ignoreIllegals: true }).value
     : hljs.highlightAuto(source).value
 
   return DOMPurify.sanitize(highlighted, {

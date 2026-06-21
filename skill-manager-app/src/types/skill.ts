@@ -38,5 +38,25 @@ export interface ScanResult {
   durationMs: number
 }
 
+export interface SkillFileEntry {
+  relativePath: string
+  name: string
+  isDirectory: boolean
+  depth: number
+}
+
+export interface SkillFileContent {
+  relativePath: string
+  content: string
+  language: string
+  isMarkdown: boolean
+  size: number
+}
+
+export interface AppOption {
+  key: string
+  label: string
+}
+
 export type DetailViewMode = 'preview' | 'source'
 export type SortMode = 'name' | 'agent' | 'version'

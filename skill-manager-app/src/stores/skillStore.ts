@@ -137,10 +137,11 @@ export const useSkillStore = defineStore('skills', {
     },
 
     ensureSelection() {
+      if (this.selectedSkillId === null) return
       const current = this.filteredSkills.find((skill) => skill.id === this.selectedSkillId)
       if (current) return
 
-      this.selectedSkillId = this.filteredSkills[0]?.id ?? null
+      this.selectedSkillId = null
     },
 
     clearFilters() {
