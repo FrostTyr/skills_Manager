@@ -15,15 +15,23 @@ pub const OPENCLAW_SOURCE_BUNDLED: &str = "openclaw-bundled";
 pub const OPENCLAW_SOURCE_EXTRA: &str = "openclaw-extra";
 
 pub fn openclaw_loaded_skills() -> Result<HashMap<String, OpenClawLoadedSkill>, String> {
+    use crate::platform;
     use std::process::Command;
 
-    let output = Command::new("openclaw")
+    let executable = platform::find_executable("openclaw")
+        .ok_or_else(|| "openclaw executable was not found".to_string())?;
+    let output = Command::new(&executable)
         .args(["skills", "list", "--eligible", "--json"])
         .output()
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| format!("unable to start {}: {error}", executable.display()))?;
 
     if !output.status.success() {
-        return Err(format!("openclaw exited with status {}", output.status));
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            format!("openclaw exited with status {}", output.status)
+        } else {
+            format!("openclaw exited with status {}: {stderr}", output.status)
+        });
     }
 
     let stdout = String::from_utf8(output.stdout).map_err(|error| error.to_string())?;
@@ -44,7 +52,13 @@ pub fn openclaw_loaded_skills() -> Result<HashMap<String, OpenClawLoadedSkill>, 
                 .get("description")
                 .and_then(serde_json::Value::as_str)
                 .map(ToString::to_string);
-            Some((name, OpenClawLoadedSkill { description, source }))
+            Some((
+                name,
+                OpenClawLoadedSkill {
+                    description,
+                    source,
+                },
+            ))
         })
         .collect();
 
@@ -163,7 +177,10 @@ pub fn openclaw_workspace_paths(
     workspaces
 }
 
-pub fn extra_skill_dirs(config: Option<&serde_json::Value>, home: &std::path::Path) -> Vec<PathBuf> {
+pub fn extra_skill_dirs(
+    config: Option<&serde_json::Value>,
+    home: &std::path::Path,
+) -> Vec<PathBuf> {
     let Some(config) = config else {
         return Vec::new();
     };
@@ -182,17 +199,28 @@ pub fn extra_skill_dirs(config: Option<&serde_json::Value>, home: &std::path::Pa
         .unwrap_or_default()
 }
 
-fn expand_tilde(path: &str, home: &std::path::Path) -> PathBuf {
-    if path == "~" {
+pub(crate) fn expand_tilde(path: &str, home: &std::path::Path) -> PathBuf {
+    let Some(rest) = path.strip_prefix('~') else {
+        return PathBuf::from(path);
+    };
+
+    if rest.is_empty() {
         home.to_path_buf()
-    } else if let Some(rest) = path.strip_prefix("~/") {
-        home.join(rest)
+    } else if rest.starts_with('/') || rest.starts_with('\\') {
+        home.join(rest.trim_start_matches(['/', '\\']))
     } else {
         PathBuf::from(path)
     }
 }
 
 pub fn find_openclaw_package_dir(home: &std::path::Path) -> Option<PathBuf> {
+    find_openclaw_package_dir_with_npm_root(home, npm_global_root())
+}
+
+pub(crate) fn find_openclaw_package_dir_with_npm_root(
+    home: &std::path::Path,
+    npm_root: Option<PathBuf>,
+) -> Option<PathBuf> {
     use super::utils::{find_executable, resolve_real_path};
 
     if let Some(path) = find_executable("openclaw") {
@@ -202,13 +230,53 @@ pub fn find_openclaw_package_dir(home: &std::path::Path) -> Option<PathBuf> {
         }
     }
 
-    [
+    find_package_in_roots(npm_root, platform_openclaw_fallbacks(home))
+}
+
+pub(crate) fn find_package_in_roots(
+    npm_root: Option<PathBuf>,
+    fallbacks: impl IntoIterator<Item = PathBuf>,
+) -> Option<PathBuf> {
+    npm_root
+        .map(|root| root.join("openclaw"))
+        .into_iter()
+        .chain(fallbacks)
+        .find(|path| path.join("skills").is_dir())
+}
+
+fn npm_global_root() -> Option<PathBuf> {
+    use super::utils::find_executable;
+    use std::process::Command;
+
+    let npm = find_executable("npm")?;
+    let output = Command::new(npm).args(["root", "-g"]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let path = String::from_utf8(output.stdout).ok()?;
+    let path = path.trim();
+    (!path.is_empty()).then(|| PathBuf::from(path))
+}
+
+#[cfg(unix)]
+fn platform_openclaw_fallbacks(home: &std::path::Path) -> Vec<PathBuf> {
+    vec![
         home.join(".npm-global/lib/node_modules/openclaw"),
         PathBuf::from("/opt/homebrew/lib/node_modules/openclaw"),
         PathBuf::from("/usr/local/lib/node_modules/openclaw"),
     ]
-    .into_iter()
-    .find(|path| path.join("skills").is_dir())
+}
+
+#[cfg(windows)]
+fn platform_openclaw_fallbacks(_home: &std::path::Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(app_data) = std::env::var_os("APPDATA") {
+        paths.push(PathBuf::from(app_data).join("npm/node_modules/openclaw"));
+    }
+    if let Some(program_files) = std::env::var_os("ProgramFiles") {
+        paths.push(PathBuf::from(program_files).join("nodejs/node_modules/openclaw"));
+    }
+    paths
 }
 
 pub fn find_ancestor_with_skills(path: &std::path::Path, max_depth: usize) -> Option<PathBuf> {

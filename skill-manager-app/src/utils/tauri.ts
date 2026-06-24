@@ -189,24 +189,18 @@ export async function readSkillFile(
 export async function getAvailableApps(): Promise<AppOption[]> {
   if (inTauri()) return invoke<AppOption[]>('available_apps')
   return [
-    { key: 'cursor', label: 'Cursor' },
-    { key: 'vscode', label: 'VS Code' },
-    { key: 'sublime', label: 'Sublime Text' },
-    { key: 'warp', label: 'Warp' },
-    { key: 'ghostty', label: 'Ghostty' },
-    { key: 'terminal', label: 'Terminal' },
-    { key: 'finder', label: 'Finder' },
+    { key: 'cursor', label: 'Cursor', kind: 'editor' },
+    { key: 'vscode', label: 'VS Code', kind: 'editor' },
+    { key: 'sublime', label: 'Sublime Text', kind: 'editor' },
+    { key: 'terminal', label: 'Terminal', kind: 'terminal' },
+    { key: 'file-manager', label: 'File Manager', kind: 'fileManager' },
   ]
 }
 
-export async function revealInFinder(path: string): Promise<void> {
-  if (inTauri()) await invoke('reveal_in_finder', { path })
+export async function revealInFileManager(path: string): Promise<void> {
+  if (inTauri()) await invoke('reveal_in_file_manager', { path })
 }
 
 export async function openInApp(path: string, app: string): Promise<void> {
   if (inTauri()) await invoke('open_in_app', { path, app })
-}
-
-export async function openInEditor(path: string, editor: 'cursor' | 'vscode'): Promise<void> {
-  if (inTauri()) await invoke('open_in_editor', { path, editor })
 }

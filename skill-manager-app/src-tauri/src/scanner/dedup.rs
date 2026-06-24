@@ -1,16 +1,16 @@
 use crate::models::Skill;
+use crate::platform;
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 pub fn dedup_skills(skills: Vec<Skill>) -> Vec<Skill> {
-    let mut seen_paths: HashMap<PathBuf, usize> = HashMap::new();
+    let mut seen_paths: HashMap<String, usize> = HashMap::new();
     let mut deduped: Vec<Skill> = Vec::new();
 
     for skill in skills {
         let path_key = if skill.is_broken_link {
-            skill.path.clone()
+            platform::path_key(&skill.path)
         } else {
-            skill.real_path.clone()
+            platform::path_key(&skill.real_path)
         };
 
         if let Some(&idx) = seen_paths.get(&path_key) {

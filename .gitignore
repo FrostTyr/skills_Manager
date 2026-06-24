@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 
 # Build outputs
 dist/
@@ -28,6 +27,8 @@ npm-debug.log*
 
 # Documentation (exclude from git)
 *.md
+!CLAUDE.md
+!.github/**/*.md
 !skill-manager-app/README.md
 !skill-manager-app/**/README.md
 

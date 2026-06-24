@@ -1,0 +1,69 @@
+name: Desktop CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  macos:
+    name: macOS regression
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: skill-manager-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: skill-manager-app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+      - name: Run frontend tests
+        run: npm run test
+      - name: Build frontend
+        run: npm run build
+
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: skill-manager-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: skill-manager-app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Compile and run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib --target x86_64-pc-windows-msvc
+      - name: Run frontend tests
+        run: npm run test
+      - name: Build frontend
+        run: npm run build
+      - name: Build Windows NSIS installer
+        run: npm run tauri:build -- --config src-tauri/tauri.windows.conf.json --target x86_64-pc-windows-msvc
+      - name: Normalize installer name
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
+          if (-not $installer) { throw "NSIS installer was not produced" }
+          Copy-Item $installer.FullName "Skill-Manager_0.2.1_x64-setup.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Skill-Manager_0.2.1_x64
+          path: skill-manager-app/Skill-Manager_0.2.1_x64-setup.exe
+          if-no-files-found: error

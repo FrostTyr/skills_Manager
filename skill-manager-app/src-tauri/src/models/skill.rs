@@ -25,6 +25,7 @@ pub struct SkillFileContent {
 pub struct AppOption {
     pub key: String,
     pub label: String,
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -56,6 +56,7 @@ export interface SkillFileContent {
 export interface AppOption {
   key: string
   label: string
+  kind: 'editor' | 'terminal' | 'fileManager'
 }
 
 export type DetailViewMode = 'preview' | 'source'

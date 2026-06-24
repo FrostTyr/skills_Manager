@@ -1,10 +1,16 @@
 use crate::models::{IssueLevel, ScanIssue};
+use crate::platform;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const SKILL_INDEX_FILENAME: &str = "SKILL.md";
-const EXCLUDED_SKILL_DIRS: &[&str] = &[".git", ".github", ".hub", ".system"];
+const EXCLUDED_SKILL_DIRS: &[&str] = &[".git", ".github", ".hub"];
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CollectOptions {
+    pub include_system: bool,
+}
 
 pub fn collect_direct_skill_entries(
     root: &Path,
@@ -28,7 +34,7 @@ pub fn collect_direct_skill_entries(
         match entry {
             Ok(entry) => {
                 let path = entry.path();
-                if is_excluded_skill_dir(&path) {
+                if is_excluded_skill_dir(&path, CollectOptions::default()) {
                     continue;
                 }
                 if enforce_root_boundary && !is_path_within_root(root, &path) {
@@ -55,9 +61,17 @@ pub fn collect_direct_skill_entries(
 }
 
 pub fn collect_skill_entries(root: &Path, issues: &mut Vec<ScanIssue>) -> Vec<PathBuf> {
+    collect_skill_entries_with_options(root, issues, CollectOptions::default())
+}
+
+pub fn collect_skill_entries_with_options(
+    root: &Path,
+    issues: &mut Vec<ScanIssue>,
+    options: CollectOptions,
+) -> Vec<PathBuf> {
     let mut entries = Vec::new();
     let mut visited = HashSet::new();
-    collect_skill_entries_inner(root, root, issues, &mut entries, &mut visited);
+    collect_skill_entries_inner(root, root, issues, &mut entries, &mut visited, options);
     entries.sort_by(|a, b| {
         a.strip_prefix(root)
             .unwrap_or(a)
@@ -71,7 +85,8 @@ fn collect_skill_entries_inner(
     path: &Path,
     issues: &mut Vec<ScanIssue>,
     entries: &mut Vec<PathBuf>,
-    visited: &mut HashSet<PathBuf>,
+    visited: &mut HashSet<String>,
+    options: CollectOptions,
 ) {
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
@@ -100,11 +115,11 @@ fn collect_skill_entries_inner(
         return;
     }
 
-    if path != root && is_excluded_skill_dir(path) {
+    if path != root && is_excluded_skill_dir(path, options) {
         return;
     }
 
-    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let canonical = platform::path_key(path);
     if !visited.insert(canonical) {
         return;
     }
@@ -120,23 +135,47 @@ fn collect_skill_entries_inner(
     };
 
     for entry in read_dir.flatten() {
-        collect_skill_entries_inner(root, &entry.path(), issues, entries, visited);
+        collect_skill_entries_inner(root, &entry.path(), issues, entries, visited, options);
     }
 }
 
-fn is_excluded_skill_dir(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| EXCLUDED_SKILL_DIRS.contains(&name))
+fn is_excluded_skill_dir(path: &Path, options: CollectOptions) -> bool {
+    let name = path.file_name().and_then(|name| name.to_str());
+    name.is_some_and(|name| {
+        EXCLUDED_SKILL_DIRS.contains(&name) || (name == ".system" && !options.include_system)
+    })
 }
 
 fn is_path_within_root(root: &Path, path: &Path) -> bool {
-    let Ok(root) = root.canonicalize() else {
-        return false;
-    };
-    let Ok(path) = path.canonicalize() else {
-        return false;
-    };
+    platform::path_is_within(root, path)
+}
 
-    path.starts_with(root)
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn system_skills_are_included_only_when_requested() {
+        let home = TempDir::new().unwrap();
+        let root = home.path().join("skills");
+        fs::create_dir_all(root.join(".system/skill-creator")).unwrap();
+        fs::write(
+            root.join(".system/skill-creator/SKILL.md"),
+            "---\nname: skill-creator\n---",
+        )
+        .unwrap();
+
+        let mut issues = Vec::new();
+        assert!(collect_skill_entries(&root, &mut issues).is_empty());
+
+        let entries = collect_skill_entries_with_options(
+            &root,
+            &mut issues,
+            CollectOptions {
+                include_system: true,
+            },
+        );
+        assert_eq!(entries, vec![root.join(".system/skill-creator")]);
+    }
 }

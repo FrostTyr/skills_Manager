@@ -1,4 +1,5 @@
 mod agents;
+mod codex;
 mod collector;
 mod dedup;
 mod openclaw;
@@ -6,8 +7,12 @@ mod parser;
 mod utils;
 
 use crate::models::{AgentDir, IssueLevel, ScanIssue, ScanResult, Skill};
+use crate::platform;
 use agents::{discover_agent_dirs, update_agent_counts};
-use collector::{collect_direct_skill_entries, collect_skill_entries, SKILL_INDEX_FILENAME};
+use collector::{
+    collect_direct_skill_entries, collect_skill_entries, collect_skill_entries_with_options,
+    CollectOptions, SKILL_INDEX_FILENAME,
+};
 use dedup::dedup_skills;
 use openclaw::{
     extra_skill_dirs, find_openclaw_package_dir, openclaw_loaded_skills, openclaw_workspace_paths,
@@ -21,7 +26,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use thiserror::Error;
-use utils::{category_from_path, normalize_path, resolve_real_path, skill_id};
+use utils::{category_from_path, resolve_real_path, skill_id};
 
 #[derive(Debug, Error)]
 pub enum ScanError {
@@ -35,12 +40,12 @@ pub enum ScanError {
 struct SkillRoot {
     path: PathBuf,
     openclaw_source: Option<&'static str>,
+    include_system: bool,
 }
 
 pub fn scan_skills() -> Result<ScanResult, ScanError> {
     let started_at = Instant::now();
-    let home = std::env::var_os("HOME").ok_or(ScanError::MissingHome)?;
-    let home = PathBuf::from(home);
+    let home = platform::home_dir().ok_or(ScanError::MissingHome)?;
 
     let mut agents = discover_agent_dirs(&home);
     let mut skills = Vec::new();
@@ -68,6 +73,14 @@ pub fn scan_skills() -> Result<ScanResult, ScanError> {
         for root in roots {
             let entries = if agent.key == "openclaw" {
                 collect_direct_skill_entries(&root.path, &mut issues, true)
+            } else if root.include_system {
+                collect_skill_entries_with_options(
+                    &root.path,
+                    &mut issues,
+                    CollectOptions {
+                        include_system: true,
+                    },
+                )
             } else {
                 collect_skill_entries(&root.path, &mut issues)
             };
@@ -101,20 +114,25 @@ pub fn scan_skills() -> Result<ScanResult, ScanError> {
     })
 }
 
-fn agent_skill_roots(
-    home: &Path,
-    agent: &AgentDir,
-    issues: &mut Vec<ScanIssue>,
-) -> Vec<SkillRoot> {
+fn agent_skill_roots(home: &Path, agent: &AgentDir, issues: &mut Vec<ScanIssue>) -> Vec<SkillRoot> {
     let mut roots = Vec::new();
 
-    if agent.key == "openclaw" {
-        push_openclaw_skill_roots(&mut roots, home, issues);
-    } else {
-        push_existing_root(&mut roots, agent.path.clone(), None);
+    match agent.key.as_str() {
+        "openclaw" => push_openclaw_skill_roots(&mut roots, home, issues),
+        "codex" => push_codex_skill_roots(&mut roots, home),
+        _ => push_existing_root(&mut roots, agent.path.clone(), None, false),
     }
 
     roots
+}
+
+fn push_codex_skill_roots(roots: &mut Vec<SkillRoot>, home: &Path) {
+    push_existing_root(roots, home.join(".codex/skills"), None, true);
+    push_existing_root(roots, home.join(".agents/skills"), None, false);
+
+    for plugin_skills in codex::plugin_skill_roots(home) {
+        push_existing_root(roots, plugin_skills, None, false);
+    }
 }
 
 fn push_openclaw_skill_roots(roots: &mut Vec<SkillRoot>, home: &Path, issues: &mut Vec<ScanIssue>) {
@@ -126,11 +144,13 @@ fn push_openclaw_skill_roots(roots: &mut Vec<SkillRoot>, home: &Path, issues: &m
             roots,
             workspace.join(".agents/skills"),
             Some(OPENCLAW_SOURCE_AGENTS_PROJECT),
+            false,
         );
         push_existing_root(
             roots,
             workspace.join("skills"),
             Some(OPENCLAW_SOURCE_WORKSPACE),
+            false,
         );
     }
 
@@ -138,12 +158,14 @@ fn push_openclaw_skill_roots(roots: &mut Vec<SkillRoot>, home: &Path, issues: &m
         roots,
         home.join(".agents/skills"),
         Some(OPENCLAW_SOURCE_AGENTS_PERSONAL),
+        false,
     );
 
     push_existing_root(
         roots,
         openclaw_home.join("skills"),
         Some(OPENCLAW_SOURCE_MANAGED),
+        false,
     );
 
     if let Some(managed_dir) = config
@@ -153,8 +175,9 @@ fn push_openclaw_skill_roots(roots: &mut Vec<SkillRoot>, home: &Path, issues: &m
     {
         push_existing_root(
             roots,
-            PathBuf::from(managed_dir),
+            openclaw::expand_tilde(managed_dir, home),
             Some(OPENCLAW_SOURCE_MANAGED),
+            false,
         );
     }
 
@@ -163,11 +186,12 @@ fn push_openclaw_skill_roots(roots: &mut Vec<SkillRoot>, home: &Path, issues: &m
             roots,
             package_dir.join("skills"),
             Some(OPENCLAW_SOURCE_BUNDLED),
+            false,
         );
     }
 
     for extra_dir in extra_skill_dirs(config.as_ref(), home) {
-        push_existing_root(roots, extra_dir, Some(OPENCLAW_SOURCE_EXTRA));
+        push_existing_root(roots, extra_dir, Some(OPENCLAW_SOURCE_EXTRA), false);
     }
 
     if let Some(extensions_dir) = config
@@ -175,7 +199,7 @@ fn push_openclaw_skill_roots(roots: &mut Vec<SkillRoot>, home: &Path, issues: &m
         .and_then(|c| c.get("extensionsDir"))
         .and_then(serde_json::Value::as_str)
     {
-        push_extension_skill_roots(roots, Path::new(extensions_dir));
+        push_extension_skill_roots(roots, &openclaw::expand_tilde(extensions_dir, home));
     }
 }
 
@@ -190,6 +214,7 @@ fn push_extension_skill_roots(roots: &mut Vec<SkillRoot>, extensions_dir: &Path)
             roots,
             entry.path().join("skills"),
             Some(OPENCLAW_SOURCE_EXTRA),
+            false,
         );
     }
 }
@@ -198,19 +223,24 @@ fn push_existing_root(
     roots: &mut Vec<SkillRoot>,
     path: PathBuf,
     openclaw_source: Option<&'static str>,
+    include_system: bool,
 ) {
     if !path.is_dir() {
         return;
     }
 
-    let key = normalize_path(&path);
-    if roots.iter().any(|root| normalize_path(&root.path) == key) {
+    let key = platform::path_key(&path);
+    if roots
+        .iter()
+        .any(|root| platform::path_key(&root.path) == key)
+    {
         return;
     }
 
     roots.push(SkillRoot {
         path,
         openclaw_source,
+        include_system,
     });
 }
 
@@ -244,7 +274,8 @@ fn scan_skill_entry(
             requires_agent: None,
             source_agents: vec![agent.key.clone()],
             source_agent_labels: vec![agent.label.clone()],
-            body: "This Skill cannot be previewed because its symlink target no longer exists.".to_string(),
+            body: "This Skill cannot be previewed because its symlink target no longer exists."
+                .to_string(),
             warnings: vec!["Symlink target not found".to_string()],
         }));
     }
@@ -334,7 +365,7 @@ fn error_to_issue(error: ScanError) -> ScanIssue {
         ScanError::MissingHome => ScanIssue {
             path: PathBuf::new(),
             level: IssueLevel::Error,
-            message: "Unable to resolve HOME directory".to_string(),
+            message: "Unable to resolve the current user home directory".to_string(),
         },
         ScanError::Parse(ParseError::Read { path, source }) => ScanIssue {
             path,
@@ -476,6 +507,7 @@ requires_agent: ">=2.0"
             .contains("did not contain a top-level skills array"));
     }
 
+    #[cfg(unix)]
     #[test]
     fn openclaw_config_read_error_generates_warning() {
         use std::fs;
@@ -545,6 +577,7 @@ requires_agent: ">=2.0"
         let _ = fs::remove_dir_all(openclaw_home);
     }
 
+    #[cfg(unix)]
     #[test]
     fn finds_openclaw_package_dir_from_nested_executable() {
         let package_dir = unique_temp_dir("openclaw-package");
@@ -617,13 +650,52 @@ requires_agent: ">=2.0"
         assert!(should_include_skill(&mut skill, None, None));
 
         // OpenClaw skills require loaded_skills map
-        assert!(!should_include_skill(&mut skill, None, Some(OPENCLAW_SOURCE_MANAGED)));
+        assert!(!should_include_skill(
+            &mut skill,
+            None,
+            Some(OPENCLAW_SOURCE_MANAGED)
+        ));
+    }
+
+    #[test]
+    fn expands_both_tilde_separator_styles() {
+        let home = Path::new("/home/example");
+        assert_eq!(openclaw::expand_tilde("~", home), home);
+        assert_eq!(
+            openclaw::expand_tilde("~/skills", home),
+            home.join("skills")
+        );
+        assert_eq!(
+            openclaw::expand_tilde(r"~\skills", home),
+            home.join("skills")
+        );
+        assert_eq!(
+            openclaw::expand_tilde("~someone/skills", home),
+            PathBuf::from("~someone/skills")
+        );
+    }
+
+    #[test]
+    fn npm_global_root_precedes_platform_fallbacks() {
+        let npm_root = unique_temp_dir("npm-root");
+        let package = npm_root.join("openclaw");
+        let fallback = unique_temp_dir("openclaw-fallback");
+        fs::create_dir_all(package.join("skills")).unwrap();
+        fs::create_dir_all(fallback.join("skills")).unwrap();
+
+        assert_eq!(
+            openclaw::find_package_in_roots(Some(npm_root.clone()), vec![fallback.clone()])
+                .as_deref(),
+            Some(package.as_path())
+        );
+
+        let _ = fs::remove_dir_all(npm_root);
+        let _ = fs::remove_dir_all(fallback);
     }
 
     #[test]
     fn openclaw_managed_skills_source_is_correct() {
-        use std::env;
-        let home = env::var_os("HOME").map(PathBuf::from).unwrap();
+        let home = platform::home_dir().unwrap();
         let openclaw_home = home.join(".openclaw");
         let managed_path = openclaw_home.join("skills");
 
@@ -633,7 +705,7 @@ requires_agent: ">=2.0"
 
         let managed_root = roots
             .iter()
-            .find(|r| normalize_path(&r.path) == normalize_path(&managed_path));
+            .find(|r| platform::path_key(&r.path) == platform::path_key(&managed_path));
 
         if managed_path.exists() {
             assert!(managed_root.is_some());
@@ -646,8 +718,7 @@ requires_agent: ">=2.0"
 
     #[test]
     fn openclaw_workspace_generates_correct_sources() {
-        use std::env;
-        let home = env::var_os("HOME").map(PathBuf::from).unwrap();
+        let home = platform::home_dir().unwrap();
         let workspace = home.join(".openclaw/workspace");
 
         if !workspace.exists() {
@@ -685,11 +756,7 @@ requires_agent: ">=2.0"
         let temp = TempDir::new().unwrap();
         let skill_dir = temp.path().join("minimal-skill");
         fs::create_dir(&skill_dir).unwrap();
-        fs::write(
-            skill_dir.join("SKILL.md"),
-            "---\nname: minimal\n---\nBody",
-        )
-        .unwrap();
+        fs::write(skill_dir.join("SKILL.md"), "---\nname: minimal\n---\nBody").unwrap();
 
         let agent = AgentDir {
             key: "test".to_string(),
@@ -705,12 +772,15 @@ requires_agent: ">=2.0"
         assert_eq!(skill.version, "Unknown");
         assert_eq!(skill.description, "(No description)");
         assert_eq!(skill.category, Some("other".to_string()));
-        assert!(skill.warnings.contains(&"Missing version field".to_string()));
+        assert!(skill
+            .warnings
+            .contains(&"Missing version field".to_string()));
         assert!(skill
             .warnings
             .contains(&"Missing description field".to_string()));
     }
 
+    #[cfg(unix)]
     #[test]
     fn broken_symlink_creates_placeholder_skill() {
         use std::os::unix::fs::symlink;
@@ -737,10 +807,79 @@ requires_agent: ">=2.0"
         assert_eq!(skill.description, "Symlink target is missing");
         assert_eq!(skill.version, "Unknown");
         assert_eq!(skill.category, Some("other".to_string()));
-        assert!(skill.warnings.contains(&"Symlink target not found".to_string()));
         assert!(skill
-            .body
-            .contains("symlink target no longer exists"));
+            .warnings
+            .contains(&"Symlink target not found".to_string()));
+        assert!(skill.body.contains("symlink target no longer exists"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn broken_windows_directory_link_creates_placeholder_skill() {
+        use std::os::windows::fs::symlink_dir;
+        use tempfile::TempDir;
+
+        let temp = TempDir::new().unwrap();
+        let broken_link = temp.path().join("broken-skill");
+        if symlink_dir(temp.path().join("missing-target"), &broken_link).is_err() {
+            return;
+        }
+
+        let agent = AgentDir {
+            key: "test".to_string(),
+            label: "Test".to_string(),
+            exists: true,
+            path: temp.path().to_path_buf(),
+            skill_count: 0,
+        };
+        let skill = scan_skill_entry(&agent, temp.path(), broken_link)
+            .unwrap()
+            .unwrap();
+        assert!(skill.is_broken_link);
+        assert!(skill.is_symlink);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_junction_resolves_to_real_skill_directory() {
+        use std::process::Command;
+        use tempfile::TempDir;
+
+        let temp = TempDir::new().unwrap();
+        let target = temp.path().join("包含 空格 target");
+        let junction = temp.path().join("junction-skill");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(
+            target.join("SKILL.md"),
+            "---\nname: junction-skill\n---\nBody",
+        )
+        .unwrap();
+
+        let status = Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&junction)
+            .arg(&target)
+            .status()
+            .unwrap();
+        if !status.success() {
+            return;
+        }
+
+        let agent = AgentDir {
+            key: "test".to_string(),
+            label: "Test".to_string(),
+            exists: true,
+            path: temp.path().to_path_buf(),
+            skill_count: 0,
+        };
+        let skill = scan_skill_entry(&agent, temp.path(), junction.clone())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            platform::path_key(&skill.real_path),
+            platform::path_key(&target)
+        );
+        let _ = fs::remove_dir(&junction);
     }
 
     fn sample_skill(name: &str) -> Skill {

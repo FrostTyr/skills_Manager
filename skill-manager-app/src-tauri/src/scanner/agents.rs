@@ -55,3 +55,20 @@ pub fn update_agent_counts(agents: &mut [AgentDir], skills: &[crate::models::Ski
             .count();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn discovers_all_default_agent_skill_directories() {
+        let home = Path::new("/users/example");
+        let agents = discover_agent_dirs(home);
+
+        assert_eq!(agents.len(), 4);
+        assert_eq!(agents[0].path, home.join(".hermes/skills"));
+        assert_eq!(agents[1].path, home.join(".codex/skills"));
+        assert_eq!(agents[2].path, home.join(".claude/skills"));
+        assert_eq!(agents[3].path, home.join(".openclaw/skills"));
+    }
+}

@@ -23,17 +23,8 @@ pub fn resolve_real_path(path: &Path, is_symlink: bool) -> (PathBuf, bool) {
     }
 }
 
-pub fn normalize_path(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
-}
-
 pub fn find_executable(name: &str) -> Option<PathBuf> {
-    use std::env;
-
-    let path_var = env::var_os("PATH")?;
-    env::split_paths(&path_var)
-        .map(|path| path.join(name))
-        .find(|path| path.is_file() || path.is_symlink())
+    crate::platform::find_executable(name)
 }
 
 pub fn skill_id(source_agent: &str, path: &Path) -> String {
