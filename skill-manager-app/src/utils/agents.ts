@@ -1,4 +1,9 @@
-const KNOWN_AGENTS = new Set(['hermes', 'codex', 'claude', 'openclaw'])
+const AGENT_ICONS: Record<string, string> = {
+  hermes: '/agents/hermes.png',
+  codex: '/agents/codex.png',
+  claude: '/agents/claude.svg',
+  openclaw: '/agents/openclaw.svg',
+}
 
 export interface AgentBadge {
   key: string
@@ -6,7 +11,7 @@ export interface AgentBadge {
 }
 
 export function agentIcon(agent: string): string {
-  return `/agents/${KNOWN_AGENTS.has(agent) ? agent : 'codex'}.png`
+  return AGENT_ICONS[agent] ?? AGENT_ICONS.codex
 }
 
 export function skillAgentBadges(

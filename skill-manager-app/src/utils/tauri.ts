@@ -35,8 +35,8 @@ Set up and use 1Password CLI for sign-in, desktop integration, and secret retrie
 
 ## References
 
-- \`references/get-started.md\` — install + integration
-- \`references/cli-examples.md\` — real \`op\` examples
+- \`references/get-started.md\` - install + integration
+- \`references/cli-examples.md\` - real \`op\` examples
 
 ## Workflow
 
@@ -59,13 +59,13 @@ mkdir -p "$SOCKET_DIR"
       realPath: '/mock/daily-log',
       isSymlink: false,
       isBrokenLink: false,
-      description: '帮助用户记录工作日志、监控项目进度和任务状态，生成日报和周报。',
+      description: 'Helps record work logs, track project progress, and generate daily and weekly summaries.',
       version: 'Unknown',
       category: 'claude',
       customTags: [],
       sourceAgents: ['claude'],
-      sourceAgentLabels: ['Claude'],
-      body: '# 每日工作日志\n\n记录工作进展、风险和下一步计划。',
+      sourceAgentLabels: ['Claude CLI'],
+      body: '# Daily work log\n\nRecord progress, risks, and next steps.',
       warnings: ['Missing version field'],
     },
     {
@@ -75,13 +75,13 @@ mkdir -p "$SOCKET_DIR"
       realPath: '/mock/env',
       isSymlink: false,
       isBrokenLink: false,
-      description: '管理开发环境配置，包括环境变量、依赖版本和工具链设置。',
+      description: 'Manages development environment settings, including variables, dependency versions, and toolchains.',
       version: '1.2',
       category: 'system',
       customTags: ['other'],
       sourceAgents: ['claude'],
-      sourceAgentLabels: ['Claude'],
-      body: '# 配置主要环境管理\n\n统一管理本地开发环境。',
+      sourceAgentLabels: ['Claude CLI'],
+      body: '# Environment management\n\nManage local development environment settings.',
       warnings: [],
     },
     {
@@ -104,7 +104,7 @@ mkdir -p "$SOCKET_DIR"
   agents: [
     { key: 'hermes', label: 'Hermes', path: '~/.hermes/skills', exists: true, skillCount: 157 },
     { key: 'codex', label: 'Codex', path: '~/.codex/skills', exists: true, skillCount: 5 },
-    { key: 'claude', label: 'Claude', path: '~/.claude/skills', exists: true, skillCount: 26 },
+    { key: 'claude', label: 'Claude CLI', path: '~/.claude/skills', exists: true, skillCount: 26 },
     {
       key: 'openclaw',
       label: 'OpenClaw',

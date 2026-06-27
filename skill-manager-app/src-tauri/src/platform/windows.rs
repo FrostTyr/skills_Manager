@@ -4,8 +4,8 @@ use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use windows_sys::Win32::System::Registry::{
-    RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE,
-    KEY_READ, KEY_WOW64_32KEY, KEY_WOW64_64KEY, REG_EXPAND_SZ, REG_SZ,
+    RegCloseKey, RegEnumKeyExW, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_CURRENT_USER,
+    HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_32KEY, KEY_WOW64_64KEY, REG_EXPAND_SZ, REG_SZ,
 };
 
 struct SupportedApp {
@@ -13,6 +13,7 @@ struct SupportedApp {
     label: &'static str,
     kind: &'static str,
     executable_names: &'static [&'static str],
+    registry_names: &'static [&'static str],
     common_locations: &'static [&'static str],
 }
 
@@ -22,13 +23,19 @@ const SUPPORTED_APPS: &[SupportedApp] = &[
         label: "Cursor",
         kind: "editor",
         executable_names: &["Cursor.exe"],
-        common_locations: &["LOCALAPPDATA|Programs\\cursor\\Cursor.exe"],
+        registry_names: &["Cursor"],
+        common_locations: &[
+            "LOCALAPPDATA|Programs\\cursor\\Cursor.exe",
+            "DriveRoots|APP\\cursor\\Cursor.exe",
+            "DriveRoots|APP\\Cursor\\Cursor.exe",
+        ],
     },
     SupportedApp {
         key: "vscode",
         label: "VS Code",
         kind: "editor",
         executable_names: &["code.exe", "Code.exe"],
+        registry_names: &["Visual Studio Code", "VS Code"],
         common_locations: &[
             "LOCALAPPDATA|Programs\\Microsoft VS Code\\Code.exe",
             "ProgramFiles|Microsoft VS Code\\Code.exe",
@@ -39,20 +46,29 @@ const SUPPORTED_APPS: &[SupportedApp] = &[
         label: "Trae",
         kind: "editor",
         executable_names: &["Trae.exe"],
-        common_locations: &["LOCALAPPDATA|Programs\\Trae\\Trae.exe"],
+        registry_names: &["Trae"],
+        common_locations: &[
+            "LOCALAPPDATA|Programs\\Trae\\Trae.exe",
+            "DriveRoots|APP\\Trae\\Trae.exe",
+        ],
     },
     SupportedApp {
         key: "sublime",
         label: "Sublime Text",
         kind: "editor",
         executable_names: &["subl.exe", "sublime_text.exe"],
-        common_locations: &["ProgramFiles|Sublime Text\\sublime_text.exe"],
+        registry_names: &["Sublime Text"],
+        common_locations: &[
+            "ProgramFiles|Sublime Text\\sublime_text.exe",
+            "DriveRoots|APP\\Sublime Text\\sublime_text.exe",
+        ],
     },
     SupportedApp {
         key: "notepadpp",
         label: "Notepad++",
         kind: "editor",
         executable_names: &["notepad++.exe"],
+        registry_names: &["Notepad++"],
         common_locations: &[
             "ProgramFiles|Notepad++\\notepad++.exe",
             "ProgramFiles(x86)|Notepad++\\notepad++.exe",
@@ -63,6 +79,7 @@ const SUPPORTED_APPS: &[SupportedApp] = &[
         label: "Windows Terminal",
         kind: "terminal",
         executable_names: &["wt.exe"],
+        registry_names: &["Windows Terminal"],
         common_locations: &[],
     },
     SupportedApp {
@@ -70,6 +87,7 @@ const SUPPORTED_APPS: &[SupportedApp] = &[
         label: "PowerShell",
         kind: "terminal",
         executable_names: &["pwsh.exe", "powershell.exe"],
+        registry_names: &["PowerShell"],
         common_locations: &[
             "ProgramFiles|PowerShell\\7\\pwsh.exe",
             "SystemRoot|System32\\WindowsPowerShell\\v1.0\\powershell.exe",
@@ -80,6 +98,7 @@ const SUPPORTED_APPS: &[SupportedApp] = &[
         label: "File Explorer",
         kind: "fileManager",
         executable_names: &["explorer.exe"],
+        registry_names: &["File Explorer", "Windows Explorer"],
         common_locations: &["SystemRoot|explorer.exe"],
     },
 ];
@@ -170,6 +189,7 @@ fn locate_app(app: &SupportedApp) -> Option<PathBuf> {
                 .iter()
                 .find_map(|name| query_app_paths(name))
         })
+        .or_else(|| query_uninstall_registry(app))
         .or_else(|| search_common_locations(app.common_locations))
 }
 
@@ -231,6 +251,173 @@ fn query_app_paths(name: &str) -> Option<PathBuf> {
     None
 }
 
+fn query_uninstall_registry(app: &SupportedApp) -> Option<PathBuf> {
+    const UNINSTALL_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+
+    for root in [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE] {
+        for access in [KEY_READ | KEY_WOW64_64KEY, KEY_READ | KEY_WOW64_32KEY] {
+            if let Some(path) = query_uninstall_registry_view(root, UNINSTALL_KEY, access, app) {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+fn query_uninstall_registry_view(
+    root: HKEY,
+    key_path: &str,
+    access: u32,
+    app: &SupportedApp,
+) -> Option<PathBuf> {
+    let key_path = wide(key_path);
+    let mut key: HKEY = std::ptr::null_mut();
+    let open_status = unsafe { RegOpenKeyExW(root, key_path.as_ptr(), 0, access, &mut key) };
+    if open_status != 0 {
+        return None;
+    }
+
+    let mut result = None;
+    for index in 0..2048 {
+        let Some(subkey_name) = enum_registry_subkey(key, index) else {
+            break;
+        };
+        if let Some(path) = query_uninstall_subkey(key, &subkey_name, access, app) {
+            result = Some(path);
+            break;
+        }
+    }
+
+    unsafe {
+        RegCloseKey(key);
+    }
+    result
+}
+
+fn query_uninstall_subkey(
+    parent: HKEY,
+    subkey_name: &str,
+    access: u32,
+    app: &SupportedApp,
+) -> Option<PathBuf> {
+    let subkey_name = wide(subkey_name);
+    let mut subkey: HKEY = std::ptr::null_mut();
+    let open_status =
+        unsafe { RegOpenKeyExW(parent, subkey_name.as_ptr(), 0, access, &mut subkey) };
+    if open_status != 0 {
+        return None;
+    }
+
+    let result = read_registry_named_string(subkey, "DisplayName")
+        .filter(|display_name| registry_display_name_matches(app, display_name))
+        .and_then(|_| installed_app_path_from_registry(subkey, app));
+
+    unsafe {
+        RegCloseKey(subkey);
+    }
+    result
+}
+
+fn installed_app_path_from_registry(key: HKEY, app: &SupportedApp) -> Option<PathBuf> {
+    read_registry_named_string(key, "DisplayIcon")
+        .and_then(|value| executable_from_registry_value(&value, app))
+        .or_else(|| {
+            read_registry_named_string(key, "InstallLocation")
+                .and_then(|value| executable_from_install_location(&value, app))
+        })
+}
+
+fn executable_from_install_location(value: &str, app: &SupportedApp) -> Option<PathBuf> {
+    let base = PathBuf::from(expand_environment_path(value.trim().trim_matches('"')));
+    app.executable_names.iter().find_map(|name| {
+        let candidate = base.join(name);
+        candidate
+            .is_file()
+            .then(|| candidate.canonicalize().unwrap_or(candidate))
+    })
+}
+
+fn executable_from_registry_value(value: &str, app: &SupportedApp) -> Option<PathBuf> {
+    let candidate = registry_executable_path(value)?;
+    let path = PathBuf::from(expand_environment_path(&candidate));
+    let file_name = path.file_name().and_then(OsStr::to_str)?;
+    app.executable_names
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case(file_name))
+        .then_some(())?;
+    path.is_file().then(|| path.canonicalize().unwrap_or(path))
+}
+
+fn registry_executable_path(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(rest) = trimmed.strip_prefix('"') {
+        return rest.find('"').map(|end| rest[..end].to_string());
+    }
+
+    let without_args = trimmed.split(',').next()?.trim();
+    let lower = without_args.to_lowercase();
+    lower
+        .find(".exe")
+        .map(|end| without_args[..end + 4].trim().to_string())
+        .or_else(|| Some(without_args.to_string()))
+}
+
+fn registry_display_name_matches(app: &SupportedApp, display_name: &str) -> bool {
+    let display_name = display_name.to_lowercase();
+    app.registry_names
+        .iter()
+        .any(|name| display_name.contains(&name.to_lowercase()))
+}
+
+fn expand_environment_path(value: &str) -> String {
+    let mut output = String::new();
+    let mut rest = value;
+    while let Some(start) = rest.find('%') {
+        output.push_str(&rest[..start]);
+        rest = &rest[start + 1..];
+        let Some(end) = rest.find('%') else {
+            output.push('%');
+            output.push_str(rest);
+            return output;
+        };
+        let name = &rest[..end];
+        if let Some(value) = std::env::var_os(name) {
+            output.push_str(&value.to_string_lossy());
+        } else {
+            output.push('%');
+            output.push_str(name);
+            output.push('%');
+        }
+        rest = &rest[end + 1..];
+    }
+    output.push_str(rest);
+    output
+}
+
+fn enum_registry_subkey(key: HKEY, index: u32) -> Option<String> {
+    let mut buffer = vec![0u16; 256];
+    let mut len = buffer.len() as u32;
+    let status = unsafe {
+        RegEnumKeyExW(
+            key,
+            index,
+            buffer.as_mut_ptr(),
+            &mut len,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+    if status != 0 {
+        return None;
+    }
+    buffer.truncate(len as usize);
+    Some(String::from_utf16_lossy(&buffer))
+}
 fn search_known_common_locations(name: &str) -> Option<PathBuf> {
     SUPPORTED_APPS
         .iter()
@@ -245,12 +432,28 @@ fn search_known_common_locations(name: &str) -> Option<PathBuf> {
 fn search_common_locations(locations: &[&str]) -> Option<PathBuf> {
     locations.iter().find_map(|location| {
         let (variable, relative) = location.split_once('|')?;
+        if variable == "DriveRoots" {
+            return drive_roots().into_iter().find_map(|base| {
+                let candidate = base.join(relative);
+                candidate
+                    .is_file()
+                    .then(|| candidate.canonicalize().unwrap_or(candidate))
+            });
+        }
+
         let base = std::env::var_os(variable)?;
         let candidate = PathBuf::from(base).join(relative);
         candidate
             .is_file()
             .then(|| candidate.canonicalize().unwrap_or(candidate))
     })
+}
+
+fn drive_roots() -> Vec<PathBuf> {
+    (b'A'..=b'Z')
+        .map(|letter| PathBuf::from(format!("{}:\\", letter as char)))
+        .filter(|path| path.is_dir())
+        .collect()
 }
 
 fn read_registry_default(root: HKEY, key_path: &str, access: u32) -> Option<PathBuf> {
@@ -268,13 +471,21 @@ fn read_registry_default(root: HKEY, key_path: &str, access: u32) -> Option<Path
     result.map(PathBuf::from)
 }
 
+fn read_registry_named_string(key: HKEY, name: &str) -> Option<String> {
+    let name = wide(name);
+    read_registry_string_value(key, name.as_ptr())
+}
 fn read_registry_string(key: HKEY) -> Option<String> {
+    read_registry_string_value(key, std::ptr::null())
+}
+
+fn read_registry_string_value(key: HKEY, value_name: *const u16) -> Option<String> {
     let mut value_type = 0;
     let mut byte_len = 0;
     let first = unsafe {
         RegQueryValueExW(
             key,
-            std::ptr::null(),
+            value_name,
             std::ptr::null_mut(),
             &mut value_type,
             std::ptr::null_mut(),
@@ -289,7 +500,7 @@ fn read_registry_string(key: HKEY) -> Option<String> {
     let second = unsafe {
         RegQueryValueExW(
             key,
-            std::ptr::null(),
+            value_name,
             std::ptr::null_mut(),
             &mut value_type,
             buffer.as_mut_ptr().cast(),

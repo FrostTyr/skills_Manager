@@ -21,7 +21,7 @@ pub const AGENTS: &[AgentConfig] = &[
     },
     AgentConfig {
         key: "claude",
-        label: "Claude",
+        label: "Claude CLI",
         relative_path: ".claude/skills",
     },
     AgentConfig {

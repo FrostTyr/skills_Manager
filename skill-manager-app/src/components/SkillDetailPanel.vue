@@ -4,14 +4,13 @@ import {
   Braces,
   ChevronDown,
   ChevronLeft,
-  Code2,
   FolderOpen,
   RefreshCw,
-  Shell,
   X,
 } from 'lucide-vue-next'
 import type { AppOption, Skill, SkillFileContent } from '@/types/skill'
 import { agentIcon, skillAgentBadges } from '@/utils/agents'
+import { appIcon } from '@/utils/apps'
 import { useSkillStore } from '@/stores/skillStore'
 
 defineProps<{
@@ -76,9 +75,7 @@ const store = useSkillStore()
               :disabled="availableApps.length === 0"
               @click="emit('toggleAppMenu')"
             >
-              <Shell v-if="selectedApp?.kind === 'terminal'" :size="14" />
-              <FolderOpen v-else-if="selectedApp?.kind === 'fileManager'" :size="14" />
-              <Code2 v-else :size="14" />
+              <img class="app-mark" :src="appIcon(selectedApp)" alt="" />
               <span>{{ selectedApp?.label ?? 'Open with' }}</span>
               <ChevronDown :size="12" />
             </button>
@@ -89,9 +86,7 @@ const store = useSkillStore()
                 :class="{ selected: app.key === selectedAppKey }"
                 @click="emit('chooseApp', app)"
               >
-                <Code2 v-if="app.kind === 'editor'" :size="14" />
-                <Shell v-else-if="app.kind === 'terminal'" :size="14" />
-                <FolderOpen v-else :size="14" />
+                <img class="app-mark" :src="appIcon(app)" alt="" />
                 <span>{{ app.label }}</span>
               </button>
             </div>

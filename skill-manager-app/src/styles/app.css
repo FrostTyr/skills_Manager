@@ -214,6 +214,13 @@
   object-fit: contain;
 }
 
+.app-mark {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  object-fit: contain;
+}
 .agent-row small,
 .tag-list small {
   color: #a1a1aa;
@@ -484,8 +491,25 @@
 }
 
 .app-select {
-  min-width: 86px;
+  width: 132px;
+  min-width: 132px;
+  max-width: 132px;
+  justify-content: flex-start;
   padding: 0 8px;
+}
+
+.app-select > span,
+.app-menu button > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-select > svg {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .app-menu {
@@ -493,7 +517,7 @@
   z-index: 20;
   right: 0;
   top: calc(100% + 6px);
-  width: 178px;
+  width: 190px;
   padding: 5px;
   border: 1px solid #e1e1e5;
   border-radius: 8px;
