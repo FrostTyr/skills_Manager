@@ -3,7 +3,6 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::SystemTime;
 
 #[derive(Debug, Deserialize)]
@@ -34,7 +33,7 @@ pub fn plugin_skill_roots(home: &Path) -> Vec<PathBuf> {
 
 fn installed_plugin_skill_roots(home: &Path) -> Option<Vec<PathBuf>> {
     let executable = find_codex_executable(home)?;
-    let output = Command::new(executable)
+    let output = super::utils::background_command(executable)
         .args(["plugin", "list", "--json"])
         .output()
         .ok()?;

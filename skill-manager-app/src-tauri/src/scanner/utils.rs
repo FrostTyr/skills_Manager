@@ -1,4 +1,6 @@
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 pub fn resolve_real_path(path: &Path, is_symlink: bool) -> (PathBuf, bool) {
     use std::fs;
@@ -26,6 +28,23 @@ pub fn resolve_real_path(path: &Path, is_symlink: bool) -> (PathBuf, bool) {
 pub fn find_executable(name: &str) -> Option<PathBuf> {
     crate::platform::find_executable(name)
 }
+
+pub fn background_command(program: impl AsRef<OsStr>) -> Command {
+    let mut command = Command::new(program);
+    configure_background_command(&mut command);
+    command
+}
+
+#[cfg(windows)]
+fn configure_background_command(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn configure_background_command(_command: &mut Command) {}
 
 pub fn skill_id(source_agent: &str, path: &Path) -> String {
     format!("{source_agent}:{}", path.to_string_lossy())

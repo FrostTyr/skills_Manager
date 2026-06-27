@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use super::utils::background_command;
+
 #[derive(Debug, Clone)]
 pub struct OpenClawLoadedSkill {
     pub description: Option<String>,
@@ -16,11 +18,10 @@ pub const OPENCLAW_SOURCE_EXTRA: &str = "openclaw-extra";
 
 pub fn openclaw_loaded_skills() -> Result<HashMap<String, OpenClawLoadedSkill>, String> {
     use crate::platform;
-    use std::process::Command;
 
     let executable = platform::find_executable("openclaw")
         .ok_or_else(|| "openclaw executable was not found".to_string())?;
-    let output = Command::new(&executable)
+    let output = background_command(&executable)
         .args(["skills", "list", "--eligible", "--json"])
         .output()
         .map_err(|error| format!("unable to start {}: {error}", executable.display()))?;
@@ -246,10 +247,9 @@ pub(crate) fn find_package_in_roots(
 
 fn npm_global_root() -> Option<PathBuf> {
     use super::utils::find_executable;
-    use std::process::Command;
 
     let npm = find_executable("npm")?;
-    let output = Command::new(npm).args(["root", "-g"]).output().ok()?;
+    let output = background_command(npm).args(["root", "-g"]).output().ok()?;
     if !output.status.success() {
         return None;
     }
