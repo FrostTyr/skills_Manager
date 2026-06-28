@@ -1,6 +1,7 @@
 use crate::models::{SkillFileContent, SkillFileEntry};
 use crate::platform;
 use std::fs;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 const MAX_SKILL_FILES: usize = 250;
@@ -24,7 +25,9 @@ pub fn read(root: &Path, relative_path: &str) -> Result<SkillFileContent, String
         return Err("Requested file is outside the scanned Skill directory".to_string());
     }
 
-    let metadata = canonical
+    let mut file =
+        fs::File::open(&canonical).map_err(|error| format!("Unable to open file: {error}"))?;
+    let metadata = file
         .metadata()
         .map_err(|error| format!("Unable to inspect file: {error}"))?;
     if !metadata.is_file() {
@@ -37,7 +40,17 @@ pub fn read(root: &Path, relative_path: &str) -> Result<SkillFileContent, String
         ));
     }
 
-    let bytes = fs::read(&canonical).map_err(|error| format!("Unable to read file: {error}"))?;
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.read_to_end(&mut bytes)
+        .map_err(|error| format!("Unable to read file: {error}"))?;
+
+    let stable_canonical = requested
+        .canonicalize()
+        .map_err(|_| format!("File changed while being previewed: {relative_path}"))?;
+    if stable_canonical != canonical || !platform::path_is_within(root, &stable_canonical) {
+        return Err("Requested file changed while being previewed".to_string());
+    }
+
     if bytes.iter().take(8_192).any(|byte| *byte == 0) {
         return Err("Binary files cannot be previewed".to_string());
     }

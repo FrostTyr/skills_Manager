@@ -1,30 +1,38 @@
 # Skill Manager
 
-基于 Tauri 2、Rust、Vue 3 和 TypeScript 的只读 AI Agent Skill 管理器。
+Skill Manager is a read-only desktop manager for AI Agent skills, built with Tauri 2, Rust, Vue 3, and TypeScript. It scans local skill directories, displays metadata, previews safe text files, and opens skill folders in supported editors or file managers.
 
-## 工程结构
+## Stack
+
+- Desktop shell: Tauri 2
+- Backend: Rust 2021
+- Frontend: Vue 3, Pinia, TypeScript, Vite
+- Content rendering: markdown-it, highlight.js, DOMPurify
+- Tests: Vitest, Cargo test
+
+## Project Structure
 
 ```text
 src/
-├── components/       页面级展示组件
-├── composables/      文件浏览、桌面应用等交互逻辑
-├── stores/           Pinia 领域状态与筛选规则
-├── types/            前后端 IPC 数据契约
-├── utils/            Tauri 客户端、Markdown 和纯函数
-└── styles/           设计令牌与全局样式
+  components/       Page-level presentation components
+  composables/      File browsing and desktop-app interaction logic
+  stores/           Pinia domain state and filtering rules
+  types/            Frontend/backend IPC data contracts
+  utils/            Tauri client helpers, Markdown rendering, pure utilities
+  styles/           Design tokens and global styles
 
 src-tauri/src/
-├── commands.rs       仅负责 Tauri IPC 参数编排
-├── services/         文件读取等应用服务
-├── state.rs          扫描结果路径白名单状态
-├── scanner/          Skill 发现、解析和去重
-├── platform/         macOS、Linux、Windows 平台适配
-└── models/           IPC 输出模型
+  commands.rs       Tauri IPC argument orchestration
+  services/         Application services such as file reads
+  state.rs          Whitelist state for paths from the latest scan
+  scanner/          Skill discovery, parsing, and deduplication
+  platform/         macOS, Linux, and Windows platform adapters
+  models/           IPC output models
 ```
 
-依赖方向保持为：组件 → composable/store → IPC client；Tauri command → service/state → scanner/platform。
+Dependency direction stays one-way: components -> composables/stores -> IPC client; Tauri commands -> services/state -> scanner/platform.
 
-## 开发
+## Local Development
 
 ```bash
 npm install
@@ -32,31 +40,62 @@ npm run dev
 npm run tauri:dev
 ```
 
-## 质量检查
+Common commands:
+
+```bash
+npm run test
+npm run build
+npm run check:frontend
+npm run check:rust
+npm run check
+npm run tauri:build
+```
+
+## Quality Gates
+
+Run this before submitting changes:
 
 ```bash
 npm run check
-cd src-tauri
-cargo fmt --check
-cargo test
-cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-## 设计约束
+The gate runs:
 
-- 产品保持只读，不执行 Skill 中的脚本。
-- 文件预览只能访问最近一次扫描产生的路径白名单。
-- Markdown 禁止原始 HTML，并在渲染后再次消毒。
-- 新交互逻辑优先进入 composable；组件保持展示和事件编排职责。
-- 新文件系统能力优先进入 `services/`；`commands.rs` 不承载遍历或解析逻辑。
+- Frontend unit tests and production build
+- Rust formatting check
+- Rust Clippy with warnings denied
+- Rust unit tests
 
-## Codex 扫描来源
+The CI workflow lives at `.github/workflows/ci.yml` and runs equivalent checks on pushes to `main` and pull requests.
 
-macOS 与 Windows 均以当前用户主目录为基准，Codex Skills 包含：
+## Engineering Constraints
 
-- `~/.codex/skills`，包括 `.system` 内置 Skills。
-- `~/.agents/skills` 共享 Skills。
-- `codex plugin list --json` 返回的已安装、已启用插件中的 Skills。
-- Codex CLI 不可用时，回退到 `~/.codex/plugins/cache` 中每个插件的最新缓存版本。
+- The product is read-only and must not execute scripts from skills.
+- File preview may only access the path whitelist produced by the latest scan.
+- File reads must validate relative paths, root boundaries, size limits, binary content, and UTF-8 content.
+- Markdown disables raw HTML and is sanitized with DOMPurify after rendering.
+- New interaction logic should live in composables; components should focus on presentation and event orchestration.
+- New filesystem capabilities should live in `services/`; `commands.rs` should not contain traversal or parsing logic.
+- Tauri capability files live in `src-tauri/capabilities/`; permission changes should be reviewed with the code that needs them.
 
-扫描结果最终按真实文件路径去重，避免软链接或多来源造成重复展示。
+## Codex Scan Sources
+
+On macOS and Windows, Codex skill scanning is based on the current user's home directory and includes:
+
+- `~/.codex/skills`, including built-in `.system` skills.
+- `~/.agents/skills` shared skills.
+- Skills from installed and enabled plugins returned by `codex plugin list --json`.
+- When the Codex CLI is unavailable, the latest cached plugin versions under `~/.codex/plugins/cache`.
+
+Scan results are deduplicated by real filesystem path to avoid duplicate display from symlinks or multiple sources.
+
+## Release Checks
+
+Before releasing, run:
+
+```bash
+npm run check
+npm run tauri:build
+```
+
+Windows-specific installer configuration lives in `src-tauri/tauri.windows.conf.json`. If installer behavior changes, update this README and the release notes or CI configuration at the same time.

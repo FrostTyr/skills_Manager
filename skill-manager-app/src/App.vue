@@ -4,6 +4,7 @@ import AppSidebar from '@/components/AppSidebar.vue'
 import SkillDetailPanel from '@/components/SkillDetailPanel.vue'
 import SkillListPanel from '@/components/SkillListPanel.vue'
 import { useDesktopApps } from '@/composables/useDesktopApps'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useSkillFiles } from '@/composables/useSkillFiles'
 import { useSkillStore } from '@/stores/skillStore'
 import type { Skill, SkillFileEntry } from '@/types/skill'
@@ -69,34 +70,19 @@ function moveSelection(offset: number) {
   if (skill) void selectSkill(skill)
 }
 
-function onKeydown(event: KeyboardEvent) {
-  if (event.metaKey && event.key.toLowerCase() === 'f') {
-    event.preventDefault()
-    sidebar.value?.focusSearch()
-    return
-  }
-  if (event.metaKey && event.key.toLowerCase() === 'r') {
-    event.preventDefault()
-    void store.refresh()
-    return
-  }
-  if (event.key === 'Escape') {
-    desktop.appMenuOpen.value = false
-    if (store.hasActiveFilter) {
-      sidebar.value?.clearSearch()
-      store.clearFilters()
-    }
-    return
-  }
-  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return
-  if (event.key === 'ArrowDown') {
-    event.preventDefault()
-    moveSelection(1)
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    moveSelection(-1)
-  }
+function closeMenus() {
+  desktop.appMenuOpen.value = false
 }
+
+useKeyboardShortcuts({
+  clearFilters: () => store.clearFilters(),
+  clearSearch: () => sidebar.value?.clearSearch(),
+  closeMenus,
+  focusSearch: () => sidebar.value?.focusSearch(),
+  hasActiveFilter: () => store.hasActiveFilter,
+  moveSelection,
+  refresh: () => store.refresh(),
+})
 
 watch(
   () => [
@@ -122,20 +108,14 @@ watch(files.errorMessage, (message) => {
 })
 
 onMounted(async () => {
-  window.addEventListener('keydown', onKeydown)
   window.addEventListener('click', closeMenus)
   await store.refresh()
   if (selectedSkill.value) await files.ensureFiles(selectedSkill.value)
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('click', closeMenus)
 })
-
-function closeMenus() {
-  desktop.appMenuOpen.value = false
-}
 </script>
 
 <template>

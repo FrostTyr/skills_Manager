@@ -32,6 +32,10 @@ const emit = defineEmits<{
 }>()
 
 const store = useSkillStore()
+
+function fileDepthClass(depth: number) {
+  return `depth-${Math.min(Math.max(depth, 0), 8)}`
+}
 </script>
 
 <template>
@@ -110,12 +114,14 @@ const store = useSkillStore()
             v-for="file in visibleFiles(skill)"
             :key="file.relativePath"
             class="file-row"
-            :class="{
-              selected:
-                skill.id === store.selectedSkillId &&
-                selectedFile?.relativePath === file.relativePath,
-            }"
-            :style="{ paddingLeft: `${10 + file.depth * 14}px` }"
+            :class="[
+              fileDepthClass(file.depth),
+              {
+                selected:
+                  skill.id === store.selectedSkillId &&
+                  selectedFile?.relativePath === file.relativePath,
+              },
+            ]"
             @click="emit('selectFile', skill, file)"
           >
             <template v-if="file.isDirectory">

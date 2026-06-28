@@ -1,0 +1,11 @@
+[[permission]]
+identifier = "allow-skill-manager-commands"
+description = "Allows the main window to call Skill Manager read-only IPC commands."
+commands.allow = [
+  "available_apps",
+  "list_skill_files",
+  "open_in_app",
+  "read_skill_file",
+  "reveal_in_file_manager",
+  "scan_skills",
+]
