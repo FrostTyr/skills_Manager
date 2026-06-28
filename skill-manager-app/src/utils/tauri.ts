@@ -50,7 +50,7 @@ Set up and use 1Password CLI for sign-in, desktop integration, and secret retrie
 SOCKET_DIR="\${OPENCLAW_TMUX_SOCKET_DIR:-\${HOME}/.openclaw/tmux}"
 mkdir -p "$SOCKET_DIR"
 \`\`\``,
-      warnings: ['Missing version field'],
+      warnings: [],
     },
     {
       id: 'claude:daily-log',
@@ -66,7 +66,7 @@ mkdir -p "$SOCKET_DIR"
       sourceAgents: ['claude'],
       sourceAgentLabels: ['Claude CLI'],
       body: '# Daily work log\n\nRecord progress, risks, and next steps.',
-      warnings: ['Missing version field'],
+      warnings: [],
     },
     {
       id: 'claude:env',

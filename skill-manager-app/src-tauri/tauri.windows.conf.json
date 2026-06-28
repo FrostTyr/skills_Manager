@@ -10,6 +10,7 @@
         "silent": true
       },
       "nsis": {
+        "installerIcon": "icons/icon.ico",
         "installMode": "currentUser",
         "startMenuFolder": "Skill Manager"
       }

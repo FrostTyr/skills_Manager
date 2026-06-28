@@ -296,9 +296,6 @@ fn scan_skill_entry(
     };
 
     let mut warnings = Vec::new();
-    if metadata.version.is_none() {
-        warnings.push("Missing version field".to_string());
-    }
     if metadata.description.is_none() {
         warnings.push("Missing description field".to_string());
     }
@@ -750,7 +747,7 @@ requires_agent: ">=2.0"
     }
 
     #[test]
-    fn missing_fields_generate_warnings() {
+    fn missing_description_generates_warning() {
         use tempfile::TempDir;
 
         let temp = TempDir::new().unwrap();
@@ -774,10 +771,10 @@ requires_agent: ">=2.0"
         assert_eq!(skill.category, Some("other".to_string()));
         assert!(skill
             .warnings
-            .contains(&"Missing version field".to_string()));
-        assert!(skill
-            .warnings
             .contains(&"Missing description field".to_string()));
+        assert!(!skill
+            .warnings
+            .contains(&"Missing version field".to_string()));
     }
 
     #[cfg(unix)]

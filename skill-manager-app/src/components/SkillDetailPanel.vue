@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import {
   AlertTriangle,
   Braces,
@@ -13,7 +14,7 @@ import { agentIcon, skillAgentBadges } from '@/utils/agents'
 import { appIcon } from '@/utils/apps'
 import { useSkillStore } from '@/stores/skillStore'
 
-defineProps<{
+const props = defineProps<{
   actionError: string | null
   actionNotice: string | null
   appMenuOpen: boolean
@@ -38,6 +39,9 @@ const emit = defineEmits<{
 }>()
 
 const store = useSkillStore()
+const hasKnownVersion = computed(() =>
+  Boolean(props.selectedSkill && props.selectedSkill.version !== 'Unknown'),
+)
 </script>
 
 <template>
@@ -133,8 +137,8 @@ const store = useSkillStore()
         </div>
 
         <div class="meta-bar">
-          <span><b>Version</b>{{ selectedSkill.version }}</span>
-          <i></i>
+          <span v-if="hasKnownVersion"><b>Version</b>{{ selectedSkill.version }}</span>
+          <i v-if="hasKnownVersion"></i>
           <span><b>Type</b>{{ selectedSkill.isSymlink ? 'Symlink' : 'Local' }}</span>
           <i></i>
           <span v-if="selectedFile"><b>Size</b>{{ Math.max(1, Math.round(selectedFile.size / 1024)) }} KB</span>

@@ -46,7 +46,7 @@
 
 .brand-copy h1 {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.25;
 }
 
@@ -54,7 +54,7 @@
 .section-label,
 .empty-small {
   color: #a1a1aa;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .brand-copy > span {
@@ -89,7 +89,7 @@
   border-radius: 999px;
   background: #f0f0f2;
   color: #71717a;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .skill-counter strong {
@@ -124,7 +124,7 @@
   border-radius: 6px;
   background: #fff;
   color: #27272a;
-  font-size: 12px;
+  font-size: 13px;
   outline: none;
 }
 
@@ -176,7 +176,7 @@
   height: 38px;
   gap: 9px;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .agent-row:hover,
@@ -224,7 +224,7 @@
 .agent-row small,
 .tag-list small {
   color: #a1a1aa;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .tag-list {
@@ -236,7 +236,7 @@
   height: 34px;
   gap: 7px;
   padding: 0 8px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .empty-small {
@@ -254,7 +254,7 @@
   border-bottom: 1px solid #f1dcc0;
   background: #fff9ed;
   color: #a16207;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .skill-list {
@@ -291,7 +291,7 @@
   justify-content: space-between;
   gap: 8px;
   color: #71717a;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .agent-label,
@@ -333,7 +333,7 @@
   margin: 11px 0 6px;
   overflow: hidden;
   color: #18181b;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -344,7 +344,7 @@
   overflow: hidden;
   margin: 0;
   color: #62626b;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.58;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -372,7 +372,7 @@
   border-radius: 4px;
   background: #f4f4f5;
   color: #71717a;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .file-toggle {
@@ -387,7 +387,7 @@
   background: transparent;
   color: #8a8a93;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .file-tree {
@@ -406,7 +406,7 @@
   background: transparent;
   color: #73737c;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .file-row:hover,
@@ -453,7 +453,7 @@
   min-width: 0;
   gap: 3px;
   color: #71717a;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .detail-actions {
@@ -472,7 +472,7 @@
   background: #fff;
   color: #52525b;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .toolbar-button:hover,
@@ -537,7 +537,7 @@
   background: transparent;
   color: #52525b;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .app-menu button:hover,
@@ -580,7 +580,7 @@
 .detail-heading h1 {
   margin: 0 0 5px;
   color: #18181b;
-  font-size: 25px;
+  font-size: 26px;
   letter-spacing: -0.025em;
   line-height: 1.2;
 }
@@ -597,7 +597,7 @@
   border-radius: 6px;
   background: #fff8e8;
   color: #996b21;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .warning-box > div,
@@ -621,7 +621,7 @@
   margin-bottom: 19px;
   border-bottom: 1px solid #eeeeef;
   color: #52525b;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .meta-bar span {
@@ -655,7 +655,7 @@
   min-height: 220px;
   gap: 9px;
   color: #a1a1aa;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .source-view {
@@ -667,7 +667,7 @@
   border-radius: 7px;
   background: #f8f8f9;
   color: #27272a;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.65;
   white-space: pre-wrap;
 }
@@ -685,7 +685,7 @@
 .empty-state p {
   margin: 0;
   color: #8b8b94;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .detail-empty {
@@ -702,7 +702,7 @@
 
 .markdown-body {
   color: #27272a;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.65;
 }
 
@@ -720,9 +720,9 @@
   margin-top: 0;
 }
 
-.markdown-body h1 { font-size: 18px; }
-.markdown-body h2 { font-size: 15px; }
-.markdown-body h3 { font-size: 13px; }
+.markdown-body h1 { font-size: 19px; }
+.markdown-body h2 { font-size: 16px; }
+.markdown-body h3 { font-size: 14px; }
 .markdown-body p { margin: 7px 0; }
 
 .markdown-body ul,
@@ -741,7 +741,7 @@
   border-radius: 4px;
   background: #f2f2f3;
   color: #3f3f46;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .markdown-body pre {
@@ -751,7 +751,7 @@
   border: 1px solid #e5e5e8;
   border-radius: 7px;
   background: #f7f7f8;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
 }
 
