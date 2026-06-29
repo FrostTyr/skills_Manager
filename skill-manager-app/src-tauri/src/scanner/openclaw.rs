@@ -1,5 +1,7 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use super::utils::background_command;
 
@@ -19,9 +21,12 @@ pub const OPENCLAW_SOURCE_EXTRA: &str = "openclaw-extra";
 pub fn openclaw_loaded_skills() -> Result<HashMap<String, OpenClawLoadedSkill>, String> {
     use crate::platform;
 
-    let executable = platform::find_executable("openclaw")
+    let home = platform::home_dir().ok_or_else(|| "home directory was not found".to_string())?;
+    let executable = find_openclaw_executable(&home)
         .ok_or_else(|| "openclaw executable was not found".to_string())?;
-    let output = background_command(&executable)
+    let mut command = background_command(&executable);
+    configure_openclaw_command(&mut command, &home);
+    let output = command
         .args(["skills", "list", "--eligible", "--json"])
         .output()
         .map_err(|error| format!("unable to start {}: {error}", executable.display()))?;
@@ -64,6 +69,20 @@ pub fn openclaw_loaded_skills() -> Result<HashMap<String, OpenClawLoadedSkill>, 
         .collect();
 
     Ok(skills)
+}
+
+fn find_openclaw_executable(home: &Path) -> Option<PathBuf> {
+    crate::platform::find_executable("openclaw").or_else(|| {
+        platform_openclaw_executables(home)
+            .into_iter()
+            .find(|path| path.is_file() || path.is_symlink())
+    })
+}
+
+fn configure_openclaw_command(command: &mut Command, home: &Path) {
+    if let Ok(path) = std::env::join_paths(openclaw_path_entries(home)) {
+        command.env("PATH", path);
+    }
 }
 
 pub fn parse_openclaw_skills_json(stdout: &str) -> Result<serde_json::Value, String> {
@@ -267,6 +286,34 @@ fn platform_openclaw_fallbacks(home: &std::path::Path) -> Vec<PathBuf> {
     ]
 }
 
+#[cfg(unix)]
+fn platform_openclaw_executables(home: &Path) -> Vec<PathBuf> {
+    vec![
+        home.join(".npm-global/bin/openclaw"),
+        PathBuf::from("/opt/homebrew/bin/openclaw"),
+        PathBuf::from("/usr/local/bin/openclaw"),
+    ]
+}
+
+#[cfg(unix)]
+fn openclaw_path_entries(home: &Path) -> Vec<PathBuf> {
+    let mut paths = vec![
+        home.join(".npm-global/bin"),
+        PathBuf::from("/opt/homebrew/bin"),
+        PathBuf::from("/usr/local/bin"),
+        PathBuf::from("/usr/bin"),
+        PathBuf::from("/bin"),
+        PathBuf::from("/usr/sbin"),
+        PathBuf::from("/sbin"),
+    ];
+    paths.extend(
+        std::env::var_os("PATH")
+            .into_iter()
+            .flat_map(|path| std::env::split_paths(&path).collect::<Vec<_>>()),
+    );
+    dedup_paths(paths)
+}
+
 #[cfg(windows)]
 fn platform_openclaw_fallbacks(_home: &std::path::Path) -> Vec<PathBuf> {
     let mut paths = Vec::new();
@@ -277,6 +324,51 @@ fn platform_openclaw_fallbacks(_home: &std::path::Path) -> Vec<PathBuf> {
         paths.push(PathBuf::from(program_files).join("nodejs/node_modules/openclaw"));
     }
     paths
+}
+
+#[cfg(windows)]
+fn platform_openclaw_executables(home: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(app_data) = std::env::var_os("APPDATA") {
+        let npm = PathBuf::from(app_data).join("npm");
+        paths.push(npm.join("openclaw.exe"));
+        paths.push(npm.join("openclaw.cmd"));
+    }
+    paths.push(home.join(r"AppData\Roaming\npm\openclaw.exe"));
+    paths.push(home.join(r"AppData\Roaming\npm\openclaw.cmd"));
+    paths
+}
+
+#[cfg(windows)]
+fn openclaw_path_entries(home: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(app_data) = std::env::var_os("APPDATA") {
+        paths.push(PathBuf::from(app_data).join("npm"));
+    }
+    paths.push(home.join(r"AppData\Roaming\npm"));
+    if let Some(program_files) = std::env::var_os("ProgramFiles") {
+        paths.push(PathBuf::from(program_files).join("nodejs"));
+    }
+    paths.extend(
+        std::env::var_os("PATH")
+            .into_iter()
+            .flat_map(|path| std::env::split_paths(&path).collect::<Vec<_>>()),
+    );
+    dedup_paths(paths)
+}
+
+fn dedup_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut seen = Vec::<OsString>::new();
+    let mut deduped = Vec::new();
+    for path in paths {
+        let key = path.as_os_str().to_os_string();
+        if seen.contains(&key) {
+            continue;
+        }
+        seen.push(key);
+        deduped.push(path);
+    }
+    deduped
 }
 
 pub fn find_ancestor_with_skills(path: &std::path::Path, max_depth: usize) -> Option<PathBuf> {

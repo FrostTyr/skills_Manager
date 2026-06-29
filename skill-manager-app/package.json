@@ -1,6 +1,6 @@
 {
   "name": "skill-manager-app",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,8 @@
     "tauri:build": "tauri build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run check:frontend && npm run check:rust",
+    "check": "npm run check:versions && npm run check:frontend && npm run check:rust",
+    "check:versions": "node scripts/check-version-consistency.mjs",
     "check:frontend": "npm run test && npm run build",
     "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml"
   },

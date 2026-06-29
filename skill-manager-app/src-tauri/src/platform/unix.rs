@@ -53,7 +53,7 @@ const SUPPORTED_APPS: &[SupportedApp] = &[
         app_name: "Terminal",
     },
     SupportedApp {
-        key: "file-manager",
+        key: "finder",
         label: "Finder",
         kind: "fileManager",
         app_name: "Finder",

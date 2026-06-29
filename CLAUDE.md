@@ -1,6 +1,6 @@
 # AI Agent Skill Manager
 
-**Version**: v0.2.1 (Windows support implementation)  
+**Version**: v0.3.1  
 **Tech Stack**: Tauri v2 + Rust + Vue 3 + TypeScript + Vite  
 **Platform**: macOS + Windows 10/11 x64
 
@@ -10,11 +10,11 @@ A desktop tool for managing Skills across multiple AI Agents (Hermes, Codex, Cla
 
 ## Current Status
 
-🚧 **v0.2.1 Windows support**
+🚧 **v0.3.1**
 - Cross-platform Skills scanning and path validation
 - Platform-specific file manager, editor, and terminal integration
 - Windows x64 NSIS packaging and CI
-- Product remains read-only; install/uninstall/sync are not part of v0.2.1
+- Product remains read-only; install/uninstall/sync are not part of v0.3.1
 
 ## Architecture
 

@@ -4,7 +4,12 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   macos:
@@ -23,12 +28,38 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install frontend dependencies
         run: npm ci
+      - name: Check version consistency
+        run: npm run check:versions
+      - name: Read package metadata
+        id: meta
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
       - name: Run frontend tests
         run: npm run test
       - name: Build frontend
         run: npm run build
+      - name: Build macOS DMG
+        run: npm run tauri:build -- --bundles dmg
+      - name: Normalize macOS artifact name
+        run: |
+          mkdir -p release-assets
+          dmg=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" -print -quit)
+          if [ -z "$dmg" ]; then
+            echo "macOS DMG was not produced" >&2
+            exit 1
+          fi
+          asset="release-assets/Skill-Manager_${{ steps.meta.outputs.version }}_macos_${{ steps.meta.outputs.arch }}.dmg"
+          cp "$dmg" "$asset"
+          shasum -a 256 "$asset" | sed "s#  release-assets/#  #" > "$asset.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Skill-Manager_${{ steps.meta.outputs.version }}_macos_${{ steps.meta.outputs.arch }}
+          path: skill-manager-app/release-assets/*
+          if-no-files-found: error
 
   windows:
     name: Windows x64
@@ -48,6 +79,14 @@ jobs:
           targets: x86_64-pc-windows-msvc
       - name: Install frontend dependencies
         run: npm ci
+      - name: Check version consistency
+        run: npm run check:versions
+      - name: Read package metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          "version=$version" >> $env:GITHUB_OUTPUT
       - name: Compile and run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib --target x86_64-pc-windows-msvc
       - name: Run frontend tests
@@ -61,9 +100,58 @@ jobs:
         run: |
           $installer = Get-ChildItem "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
           if (-not $installer) { throw "NSIS installer was not produced" }
-          Copy-Item $installer.FullName "Skill-Manager_0.2.1_x64-setup.exe"
+          New-Item -ItemType Directory -Force -Path "release-assets" | Out-Null
+          $asset = "release-assets/Skill-Manager_${{ steps.meta.outputs.version }}_windows_x64-setup.exe"
+          Copy-Item $installer.FullName $asset
+          $hash = (Get-FileHash -Algorithm SHA256 $asset).Hash.ToLowerInvariant()
+          $fileName = Split-Path $asset -Leaf
+          "$hash  $fileName" | Out-File -Encoding ascii "$asset.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: Skill-Manager_0.2.1_x64
-          path: skill-manager-app/Skill-Manager_0.2.1_x64-setup.exe
+          name: Skill-Manager_${{ steps.meta.outputs.version }}_windows_x64
+          path: skill-manager-app/release-assets/*
           if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - macos
+      - windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Validate release version
+        id: meta
+        working-directory: skill-manager-app
+        run: |
+          node scripts/check-version-consistency.mjs --tag "$GITHUB_REF_NAME"
+          version=$(node -p "require('./package.json').version")
+          release_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_date=$release_date" >> "$GITHUB_OUTPUT"
+      - name: Generate release manifest
+        working-directory: skill-manager-app
+        env:
+          RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_DATE: ${{ steps.meta.outputs.release_date }}
+          RELEASE_ASSETS_DIR: ../release-assets
+          RELEASE_MANIFEST_OUTPUT: ../release-assets/release-manifest.json
+        run: node scripts/create-release-manifest.mjs
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Skill Manager $GITHUB_REF_NAME"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release-assets/* --title "$title" --generate-notes
+          fi

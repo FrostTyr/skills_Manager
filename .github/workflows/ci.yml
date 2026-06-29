@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check version consistency
+        run: npm run check:versions
+
       - name: Test and build
         run: npm run check:frontend
 

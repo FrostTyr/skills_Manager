@@ -79,8 +79,10 @@ const hasKnownVersion = computed(() =>
               :disabled="availableApps.length === 0"
               @click="emit('toggleAppMenu')"
             >
-              <img class="app-mark" :src="appIcon(selectedApp)" alt="" />
-              <span>{{ selectedApp?.label ?? 'Open with' }}</span>
+              <span class="app-icon-cell">
+                <img class="app-mark" :src="appIcon(selectedApp)" alt="" />
+              </span>
+              <span class="app-label">{{ selectedApp?.label ?? 'Open with' }}</span>
               <ChevronDown :size="12" />
             </button>
             <div v-if="appMenuOpen" class="app-menu">
@@ -90,8 +92,10 @@ const hasKnownVersion = computed(() =>
                 :class="{ selected: app.key === selectedAppKey }"
                 @click="emit('chooseApp', app)"
               >
-                <img class="app-mark" :src="appIcon(app)" alt="" />
-                <span>{{ app.label }}</span>
+                <span class="app-icon-cell">
+                  <img class="app-mark" :src="appIcon(app)" alt="" />
+                </span>
+                <span class="app-label">{{ app.label }}</span>
               </button>
             </div>
           </div>
@@ -118,6 +122,7 @@ const hasKnownVersion = computed(() =>
             >
               <img
                 class="agent-mark"
+                :class="`agent-mark-${agent.key}`"
                 :src="agentIcon(agent.key)"
                 alt=""
               />

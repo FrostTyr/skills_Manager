@@ -1,6 +1,6 @@
 .app-shell {
   display: grid;
-  grid-template-columns: 21% 30% 1fr;
+  grid-template-columns: var(--sidebar-width, 300px) 8px var(--list-width, 520px) 8px minmax(420px, 1fr);
   width: 100%;
   height: 100vh;
   background: #fff;
@@ -24,7 +24,27 @@
 .sidebar,
 .list-panel {
   background: #f7f7f8;
-  border-right: 1px solid #e9e9eb;
+}
+
+.panel-resizer {
+  position: relative;
+  z-index: 5;
+  background: #f7f7f8;
+  cursor: col-resize;
+}
+
+.panel-resizer::before {
+  position: absolute;
+  inset: 0 3px;
+  background: #e9e9eb;
+  content: '';
+  transition: background 0.12s ease, inset 0.12s ease;
+}
+
+.panel-resizer:hover::before,
+.panel-resizer.active::before {
+  inset: 0 2px;
+  background: #c7c7cd;
 }
 
 .brand {
@@ -208,17 +228,29 @@
   object-fit: contain;
 }
 
+.agent-mark-codex {
+  transform: scale(1.08);
+}
+
 .detail-tags .agent-chip > .agent-mark {
   width: 18px;
   height: 18px;
   object-fit: contain;
 }
 
+.app-icon-cell {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  align-items: center;
+  justify-content: center;
+}
+
 .app-mark {
   display: block;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+  width: 18px;
+  height: 18px;
   object-fit: contain;
 }
 .agent-row small,
@@ -504,14 +536,16 @@
   min-width: 132px;
   max-width: 132px;
   justify-content: flex-start;
-  padding: 0 8px;
+  padding: 0 7px;
+  text-align: left;
 }
 
-.app-select > span,
-.app-menu button > span {
+.app-select > .app-label,
+.app-menu button > .app-label {
   min-width: 0;
   flex: 1;
   overflow: hidden;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -537,16 +571,17 @@
 .app-menu button {
   display: flex;
   width: 100%;
-  height: 31px;
+  height: 34px;
   align-items: center;
-  gap: 8px;
-  padding: 0 9px;
+  gap: 9px;
+  padding: 0 10px;
   border: 0;
   border-radius: 5px;
   background: transparent;
   color: #52525b;
   cursor: pointer;
   font-size: 12px;
+  text-align: left;
 }
 
 .app-menu button:hover,

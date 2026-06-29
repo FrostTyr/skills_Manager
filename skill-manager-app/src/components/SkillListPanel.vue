@@ -75,7 +75,12 @@ function fileDepthClass(depth: number) {
               :key="agent.key"
               class="agent-source"
             >
-              <img class="agent-mark" :src="agentIcon(agent.key)" alt="" />
+              <img
+                class="agent-mark"
+                :class="`agent-mark-${agent.key}`"
+                :src="agentIcon(agent.key)"
+                alt=""
+              />
               {{ agent.label }}
             </span>
           </span>

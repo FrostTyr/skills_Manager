@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { Hash, RefreshCw, Search, X } from 'lucide-vue-next'
 import { onBeforeUnmount, ref } from 'vue'
+import packageJson from '../../package.json'
 import { useSkillStore } from '@/stores/skillStore'
 import { agentIcon } from '@/utils/agents'
 
 defineProps<{ filteredCount: number }>()
 
+const appVersion = packageJson.version
 const store = useSkillStore()
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
@@ -42,7 +44,7 @@ onBeforeUnmount(() => {
       <img class="app-logo" src="/icon.svg" alt="" aria-hidden="true" />
       <div class="brand-copy">
         <h1>Skill Manager</h1>
-        <span>v0.2.1</span>
+        <span>v{{ appVersion }}</span>
       </div>
       <button
         class="bare-icon"
@@ -77,18 +79,22 @@ onBeforeUnmount(() => {
       <section class="filter-section">
         <div class="section-label">Agents</div>
         <button
-          v-for="agent in store.agents"
+          v-for="agent in store.visibleAgents"
           :key="agent.key"
           class="agent-row"
           :class="{
             active: store.selectedAgents.includes(agent.key),
             muted: store.selectedAgents.length > 0 && !store.selectedAgents.includes(agent.key),
-            missing: !agent.exists,
           }"
           :title="agent.path"
           @click="store.toggleAgent(agent.key)"
         >
-          <img class="agent-mark" :src="agentIcon(agent.key)" alt="" />
+          <img
+            class="agent-mark"
+            :class="`agent-mark-${agent.key}`"
+            :src="agentIcon(agent.key)"
+            alt=""
+          />
           <span>{{ agent.label }}</span>
           <small>{{ agent.skillCount }}</small>
         </button>

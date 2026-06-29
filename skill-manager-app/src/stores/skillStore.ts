@@ -113,6 +113,10 @@ export const useSkillStore = defineStore('skills', {
         state.selectedTags.length > 0
       )
     },
+
+    visibleAgents(state): AgentDir[] {
+      return state.agents.filter((agent) => agent.exists)
+    },
   },
 
   actions: {
@@ -124,6 +128,9 @@ export const useSkillStore = defineStore('skills', {
         const result = await scanSkills()
         this.skills = result.skills
         this.agents = result.agents
+        this.selectedAgents = this.selectedAgents.filter((key) =>
+          this.visibleAgents.some((agent) => agent.key === key),
+        )
         this.issues = result.issues
         this.availableTags = buildTagCounts(result.skills)
         this.scanDurationMs = result.durationMs

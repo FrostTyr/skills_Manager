@@ -5,6 +5,7 @@ import SkillDetailPanel from '@/components/SkillDetailPanel.vue'
 import SkillListPanel from '@/components/SkillListPanel.vue'
 import { useDesktopApps } from '@/composables/useDesktopApps'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { useResizablePanels } from '@/composables/useResizablePanels'
 import { useSkillFiles } from '@/composables/useSkillFiles'
 import { useSkillStore } from '@/stores/skillStore'
 import type { Skill, SkillFileEntry } from '@/types/skill'
@@ -21,6 +22,7 @@ const files = useSkillFiles()
 const filteredSkills = computed(() => store.filteredSkills)
 const selectedSkill = computed(() => store.selectedSkill)
 const desktop = useDesktopApps(() => selectedSkill.value)
+const layout = useResizablePanels()
 
 const selectedFileName = computed(
   () => files.selectedFile.value?.relativePath.split('/').pop() ?? '',
@@ -74,6 +76,14 @@ function closeMenus() {
   desktop.appMenuOpen.value = false
 }
 
+function startSidebarResize(event: PointerEvent) {
+  layout.startResize('sidebar', event)
+}
+
+function startListResize(event: PointerEvent) {
+  layout.startResize('list', event)
+}
+
 useKeyboardShortcuts({
   clearFilters: () => store.clearFilters(),
   clearSearch: () => sidebar.value?.clearSearch(),
@@ -119,8 +129,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :style="layout.shellStyle.value">
     <AppSidebar ref="sidebar" :filtered-count="filteredSkills.length" />
+    <div
+      class="panel-resizer"
+      :class="{ active: layout.activePanel.value === 'sidebar' }"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize agent sidebar"
+      @pointerdown="startSidebarResize"
+    ></div>
     <SkillListPanel
       :collapsed-directories="files.collapsedDirectories.value"
       :directory-key="files.directoryKey"
@@ -135,6 +153,14 @@ onBeforeUnmount(() => {
       @select-skill="selectSkill"
       @toggle-files="files.toggleSkillFiles"
     />
+    <div
+      class="panel-resizer"
+      :class="{ active: layout.activePanel.value === 'list' }"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize skill list"
+      @pointerdown="startListResize"
+    ></div>
     <SkillDetailPanel
       :action-error="desktop.actionError.value"
       :action-notice="desktop.actionNotice.value"

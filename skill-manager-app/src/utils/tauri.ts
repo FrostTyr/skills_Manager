@@ -191,9 +191,10 @@ export async function getAvailableApps(): Promise<AppOption[]> {
   return [
     { key: 'cursor', label: 'Cursor', kind: 'editor' },
     { key: 'vscode', label: 'VS Code', kind: 'editor' },
+    { key: 'trae', label: 'Trae', kind: 'editor' },
     { key: 'sublime', label: 'Sublime Text', kind: 'editor' },
     { key: 'terminal', label: 'Terminal', kind: 'terminal' },
-    { key: 'file-manager', label: 'File Manager', kind: 'fileManager' },
+    { key: 'finder', label: 'Finder', kind: 'fileManager' },
   ]
 }
 

@@ -8,7 +8,7 @@ mod utils;
 
 use crate::models::{AgentDir, IssueLevel, ScanIssue, ScanResult, Skill};
 use crate::platform;
-use agents::{discover_agent_dirs, update_agent_counts};
+use agents::{discover_agent_dirs, is_agent_installed, update_agent_counts};
 use collector::{
     collect_direct_skill_entries, collect_skill_entries, collect_skill_entries_with_options,
     CollectOptions, SKILL_INDEX_FILENAME,
@@ -52,8 +52,12 @@ pub fn scan_skills() -> Result<ScanResult, ScanError> {
     let mut issues = Vec::new();
 
     for agent in &mut agents {
+        agent.exists = is_agent_installed(&home, &agent.key);
+        if !agent.exists {
+            continue;
+        }
+
         let roots = agent_skill_roots(&home, agent, &mut issues);
-        agent.exists = !roots.is_empty();
         let openclaw_loaded_skills = if agent.key == "openclaw" && agent.exists {
             match openclaw_loaded_skills() {
                 Ok(skills) => Some(skills),

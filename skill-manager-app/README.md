@@ -51,6 +51,15 @@ npm run check
 npm run tauri:build
 ```
 
+## Downloads
+
+Versioned desktop installers are published from git tags through GitHub Releases:
+
+- Releases page: <https://github.com/FrostTyr/skills_Manager/releases>
+- Windows: `Skill-Manager_<version>_windows_x64-setup.exe`
+- macOS: `Skill-Manager_<version>_macos_<arch>.dmg`
+- Release metadata: each release includes `release-manifest.json` with the release date, assets, download URLs, file sizes, and SHA256 hashes.
+
 ## Quality Gates
 
 Run this before submitting changes:
@@ -61,12 +70,13 @@ npm run check
 
 The gate runs:
 
+- Version consistency checks across `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`
 - Frontend unit tests and production build
 - Rust formatting check
 - Rust Clippy with warnings denied
 - Rust unit tests
 
-The CI workflow lives at `.github/workflows/ci.yml` and runs equivalent checks on pushes to `main` and pull requests.
+The code quality workflow lives at `.github/workflows/ci.yml` and runs equivalent checks on pushes to `main` and pull requests. The desktop workflow lives at `.github/workflows/desktop-ci.yml`; it runs platform regression checks, builds Windows and macOS installers, uploads CI artifacts, and publishes GitHub Releases for `v*` tags.
 
 ## Engineering Constraints
 
@@ -91,11 +101,22 @@ Scan results are deduplicated by real filesystem path to avoid duplicate display
 
 ## Release Checks
 
-Before releasing, run:
+Before releasing, make sure the version is identical in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`, then run:
 
 ```bash
 npm run check
-npm run tauri:build
+npm run tauri:build -- --bundles dmg
 ```
 
-Windows-specific installer configuration lives in `src-tauri/tauri.windows.conf.json`. If installer behavior changes, update this README and the release notes or CI configuration at the same time.
+Windows-specific installer configuration lives in `src-tauri/tauri.windows.conf.json`. Windows installers are built on the `windows-latest` GitHub Actions runner with the `x86_64-pc-windows-msvc` target.
+
+To publish a version, create and push a matching tag from the release commit:
+
+```bash
+git tag v0.3.1
+git push origin v0.3.1
+```
+
+The tag version must match `package.json`; the release job will stop if the tag and package version differ. GitHub Releases is the source of truth for installer update dates. The generated `release-manifest.json` mirrors that date in its `releaseDate` field and lists every uploaded installer with its SHA256 hash.
+
+If installer behavior, artifact names, or supported platforms change, update this README and `.github/workflows/desktop-ci.yml` in the same change.
