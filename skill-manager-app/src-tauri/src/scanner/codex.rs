@@ -127,19 +127,70 @@ fn find_codex_executable(home: &Path) -> Option<PathBuf> {
 
 #[cfg(unix)]
 fn codex_fallback_executables(home: &Path) -> Vec<PathBuf> {
-    vec![
+    let mut paths = vec![
         home.join(".npm-global/bin/codex"),
         PathBuf::from("/opt/homebrew/bin/codex"),
         PathBuf::from("/usr/local/bin/codex"),
-    ]
+    ];
+    paths.extend(codex_desktop_executables(home));
+    paths
 }
 
 #[cfg(windows)]
 fn codex_fallback_executables(home: &Path) -> Vec<PathBuf> {
-    vec![
+    let mut paths = vec![
         home.join(r"AppData\Roaming\npm\codex.exe"),
         home.join(r"AppData\Roaming\npm\codex.cmd"),
-    ]
+    ];
+    paths.extend(codex_desktop_executables(home));
+    paths
+}
+
+#[cfg(target_os = "macos")]
+fn codex_desktop_executables(_home: &Path) -> Vec<PathBuf> {
+    vec![PathBuf::from(
+        "/Applications/Codex.app/Contents/Resources/codex",
+    )]
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn codex_desktop_executables(_home: &Path) -> Vec<PathBuf> {
+    Vec::new()
+}
+
+#[cfg(windows)]
+fn codex_desktop_executables(home: &Path) -> Vec<PathBuf> {
+    codex_windows_desktop_paths(home, r"resources\codex.exe")
+}
+
+#[cfg(windows)]
+fn codex_windows_desktop_paths(home: &Path, executable: &str) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    let relative_locations = [
+        format!(r"Programs\Codex\{executable}"),
+        format!(r"Programs\OpenAI Codex\{executable}"),
+    ];
+
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        let local_app_data = PathBuf::from(local_app_data);
+        paths.extend(relative_locations.iter().map(|path| local_app_data.join(path)));
+    }
+    paths.extend(
+        relative_locations
+            .iter()
+            .map(|path| home.join("AppData").join("Local").join(path)),
+    );
+    if let Some(program_files) = std::env::var_os("ProgramFiles") {
+        let program_files = PathBuf::from(program_files);
+        paths.push(program_files.join("Codex").join(executable));
+        paths.push(program_files.join("OpenAI Codex").join(executable));
+    }
+    if let Some(program_files_x86) = std::env::var_os("ProgramFiles(x86)") {
+        let program_files_x86 = PathBuf::from(program_files_x86);
+        paths.push(program_files_x86.join("Codex").join(executable));
+        paths.push(program_files_x86.join("OpenAI Codex").join(executable));
+    }
+    paths
 }
 
 fn parse_json_after_log_noise(stdout: &str) -> Option<serde_json::Value> {
@@ -202,5 +253,15 @@ mod tests {
         let roots = cached_plugin_skill_roots(home.path());
 
         assert_eq!(roots, vec![newer]);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_fallbacks_include_codex_desktop_executable() {
+        let home = Path::new("/users/example");
+
+        assert!(codex_fallback_executables(home).contains(&PathBuf::from(
+            "/Applications/Codex.app/Contents/Resources/codex"
+        )));
     }
 }

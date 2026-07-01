@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "version": "0.3.1",
+  "tag": "v0.3.1",
+  "releaseDate": "2026-07-01T06:51:34.666Z",
+  "source": {
+    "repository": "FrostTyr/skills_Manager",
+    "commit": null
+  },
+  "assets": [
+    {
+      "name": "Skill-Manager_0.3.1_macos_aarch64.app.tar.gz",
+      "platform": "macos",
+      "arch": "arm64",
+      "sizeBytes": 3463147,
+      "sha256": "e2799396c128d2b5fe316ebf5b6c96fe40b447f9eb3d5ae5971afe0d0318c8f0",
+      "downloadUrl": "https://github.com/FrostTyr/skills_Manager/releases/download/v0.3.1/Skill-Manager_0.3.1_macos_aarch64.app.tar.gz"
+    }
+  ]
+}

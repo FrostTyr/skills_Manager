@@ -58,6 +58,10 @@ pub fn is_agent_installed(home: &Path, key: &str) -> bool {
         return false;
     };
 
+    if agent.key == "codex" && codex_data_or_desktop_app_exists(home) {
+        return true;
+    }
+
     platform::find_executable(agent.executable_name).is_some()
         || agent_cli_candidates(home, agent)
             .into_iter()
@@ -98,9 +102,68 @@ fn agent_cli_candidates(home: &Path, agent: &AgentConfig) -> Vec<PathBuf> {
     paths
 }
 
+fn codex_data_or_desktop_app_exists(home: &Path) -> bool {
+    home.join(".codex/skills").is_dir()
+        || home.join(".codex/plugins/cache").is_dir()
+        || codex_desktop_candidates(home)
+            .into_iter()
+            .any(|path| path.is_file() || path.is_symlink())
+}
+
+#[cfg(target_os = "macos")]
+fn codex_desktop_candidates(_home: &Path) -> Vec<PathBuf> {
+    vec![PathBuf::from(
+        "/Applications/Codex.app/Contents/Resources/codex",
+    )]
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn codex_desktop_candidates(_home: &Path) -> Vec<PathBuf> {
+    Vec::new()
+}
+
+#[cfg(windows)]
+fn codex_desktop_candidates(home: &Path) -> Vec<PathBuf> {
+    let mut paths = codex_windows_desktop_paths(home, "Codex.exe");
+    paths.extend(codex_windows_desktop_paths(home, r"resources\codex.exe"));
+    paths
+}
+
+#[cfg(windows)]
+fn codex_windows_desktop_paths(home: &Path, executable: &str) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    let relative_locations = [
+        format!(r"Programs\Codex\{executable}"),
+        format!(r"Programs\OpenAI Codex\{executable}"),
+    ];
+
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        let local_app_data = PathBuf::from(local_app_data);
+        paths.extend(relative_locations.iter().map(|path| local_app_data.join(path)));
+    }
+    paths.extend(
+        relative_locations
+            .iter()
+            .map(|path| home.join("AppData").join("Local").join(path)),
+    );
+    if let Some(program_files) = std::env::var_os("ProgramFiles") {
+        let program_files = PathBuf::from(program_files);
+        paths.push(program_files.join("Codex").join(executable));
+        paths.push(program_files.join("OpenAI Codex").join(executable));
+    }
+    if let Some(program_files_x86) = std::env::var_os("ProgramFiles(x86)") {
+        let program_files_x86 = PathBuf::from(program_files_x86);
+        paths.push(program_files_x86.join("Codex").join(executable));
+        paths.push(program_files_x86.join("OpenAI Codex").join(executable));
+    }
+    paths
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn discovers_all_default_agent_skill_directories() {
@@ -123,5 +186,13 @@ mod tests {
 
         assert!(candidates.contains(&home.join(".npm-global/bin/codex")));
         assert!(candidates.contains(&PathBuf::from("/opt/homebrew/bin/codex")));
+    }
+
+    #[test]
+    fn codex_is_installed_when_skill_data_exists_without_cli() {
+        let home = TempDir::new().unwrap();
+        fs::create_dir_all(home.path().join(".codex/skills")).unwrap();
+
+        assert!(is_agent_installed(home.path(), "codex"));
     }
 }
