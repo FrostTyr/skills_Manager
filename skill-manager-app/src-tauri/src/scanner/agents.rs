@@ -139,7 +139,11 @@ fn codex_windows_desktop_paths(home: &Path, executable: &str) -> Vec<PathBuf> {
 
     if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
         let local_app_data = PathBuf::from(local_app_data);
-        paths.extend(relative_locations.iter().map(|path| local_app_data.join(path)));
+        paths.extend(
+            relative_locations
+                .iter()
+                .map(|path| local_app_data.join(path)),
+        );
     }
     paths.extend(
         relative_locations
